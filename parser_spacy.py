@@ -3,6 +3,18 @@ from spacy import displacy
 from IPython import embed
 nlp = spacy.load('en_core_web_trf')
 
+def in_range(i, search_range):
+    """checks if i is in search range (inclusive bottom, exclusive top)
+
+    args:
+        i: the value we're finding
+        search_range: the search range.
+
+    returns:
+        bool
+    """
+    return (i >= search_range[0]) and (i < search_range[1])
+
 def find_noun_indices(doc):
     """Finds indices of nouns.
 
@@ -14,9 +26,11 @@ def find_noun_indices(doc):
     """
     noun_list = []
     for i in range(len(doc)):
-        if doc[i].pos_ == "NOUN":
+        if doc[i].pos_ == "NOUN" or doc[i].pos_ == "PROPN":
+            # Sometimes spacy misclassifies nouns as propositions.
+            # keep an eye on this. Hopefully it doesn't break anything
+            # else.
             noun_list.append(i)
-
     return noun_list
 
 def propagate_to_dependents(doc, start_idx):
@@ -53,9 +67,9 @@ def extract_all_noun_phrases(doc):
     returns:
         list of noun clause indices.
     """
+    directional_words = ["left", "right", "top", "bottom", "from right"]
     nouns = find_noun_indices(doc)
     index_ranges = []
-
     for noun in nouns:
         index_list = propagate_to_dependents(doc, noun)
 
@@ -78,8 +92,163 @@ def extract_all_noun_phrases(doc):
     for i in range(len(index_ranges)):
         if i not in to_remove_indices:
             new_idx_range_list.append(index_ranges[i])
+
+    idx_range_list = new_idx_range_list
+
+    # blend adjacent direction words
+    new_idx_range_list = []
+    skip = False
+    for i in range(len(idx_range_list)-1):
+        if skip:
+            skip = False
+            continue
+        for directional_word in directional_words:
+            if directional_word in str(doc[idx_range_list[i][1]:idx_range_list[i+1][0]+1]):
+                new_idx_range_list.append((
+                    idx_range_list[i][0], idx_range_list[i+1][1]))
+                skip = True
+                break
+        if not skip:
+            new_idx_range_list.append(idx_range_list[i])
+    if not skip:
+        new_idx_range_list.append(idx_range_list[-1])
+    idx_range_list = new_idx_range_list
+    # The length should be two. If not, let's figure it out.
+    if len(idx_range_list) > 2:
+        # If greater than two, there is probably an adposition between
+        # two noun clauses. Most often occurs where "on" occurs twice.
+        # e.g., put the mug on the left on the bowl.
+
+        # so find adpositions between two noun clauses.
+        # See which noun clauses are separated by one word, and combine if
+        # that word is an adpositon.
+        one_word_sep = []
+        one_word_sep_flat = []
+        for i in range(len(idx_range_list)):
+            for j in range(len(idx_range_list)):
+                if idx_range_list[i][0] - idx_range_list[j][1] == 1:
+                    one_word_sep.append([i, j])
+                    one_word_sep_flat.append(i)
+                    one_word_sep_flat.append(j)
+
+        # keep all elements that are not in one_word_sep
+        idx_range_list_new = []
+        for i in range(len(idx_range_list)):
+            if i not in one_word_sep_flat:
+                idx_range_list_new.append(idx_range_list[i])
+
+        # if there's only one element that meets our criteria, we can combine
+        # but if there's more than one, things can get weird.
+        if len(one_word_sep) == 1:
+            for pair in one_word_sep:
+                if doc[idx_range_list[pair[1]][1]].pos_ == "ADP":
+                    combined_range = idx_range_list[pair[0]] + idx_range_list[pair[1]]
+                    idx_range_list_new.append((min(combined_range), max(combined_range)))
+            idx_range_list = idx_range_list_new
+        else:
+            # we have some ambiguity now. If there's a directional word, the
+            # phrase probably goes with the one before.
+            
+            join_indices = []
+            join_indices_flat = []
+            for pair in one_word_sep:
+                for word in directional_words:
+                    idx_range = idx_range_list[max(pair)]
+                    if word in str(doc[idx_range[0]:idx_range[1]]):
+                        join_indices.append(pair)
+                        join_indices_flat += pair
+
+            for pair in join_indices:
+                combined_range = idx_range_list[pair[0]]+idx_range_list[pair[1]]
+                idx_range_list_new.append([min(combined_range), max(combined_range)])
+            for i in range(len(idx_range_list)):
+                if i not in join_indices_flat:
+                    idx_range_list_new.append(idx_range_list[i])
+
+            idx_range_list = idx_range_list_new
+
+    return idx_range_list
+
+def separate_pick_and_place(doc, indices):
+    """Choose which noun phrase is the pick, and which is the place.
+
+    args:
+        doc: a spacy document.
+        indices: the start and end indices of noun phrases. (2x2) list/list/int
+
+    returns:
+        dict containing keys pick_range and place_range
+    """
+    # First make sure that there are two indices
+    assert len(indices) == 2
+
+    returning_default = True
     
-    embed()
+    # sort the indices
+    if indices[0][0] < indices[1][0]:
+        first_object = indices[0]
+        second_object = indices[1]
+    else:
+        first_object = indices[1]
+        second_object = indices[0]
+
+    # if none of our conditions are met, just return the first one as pick
+    # and the second as place.
+    pick_object = first_object
+    place_object = second_object
+    
+    # First test: if only one direct object, that is the pick object.
+    direct_objects = get_direct_object_indices(doc)
+    if len(direct_objects) == 1:
+        returning_default = False
+        if direct_objects[0] > indices[0][0] and direct_objects[0] < indices[0][1]:
+            pick_object = indices[0]
+            place_object = indices[1]
+        else:
+            pick_object = indices[1]
+            place_object = indices[0]
+    elif len(direct_objects) == 0:
+        # set the nominative subject as the pick object.
+        for i in range(len(doc)):
+            if doc[i].dep_ == 'nsubj':
+                pick_object = first_object if in_range(i, first_object) else second_object
+                returning_default = False
+                break
+    elif len(direct_objects) == 2:
+        # if a dative exists, and is not right next to its head
+        # the target phrase is between it and its head.
+        exists_dative = False
+        dative_loc = -1
+        head_loc = -1
+        for i in range(len(doc)):
+            if doc[i].dep_ == "dative" and doc[i].head.i != i-1:
+                exists_dative = True
+                dative_loc = i
+                head_loc = doc[i].head.i
+
+        if exists_dative:
+            for i in range(head_loc, dative_loc):
+                # if the subject here is a pronoun, use the first object.
+                if doc[i].pos_ == "PRON":
+                    returning_default = False
+                    pick_object = first_object
+                    place_object = second_object
+                elif in_range(i, first_object) or in_range(i, second_object):
+                    returning_default = False
+                    pick_object = first_object if in_range(i, first_object) else second_object
+                    place_object = second_object if in_range(i, first_object) else second_object
+        if not exists_dative:
+            returning_default = False
+            # if there is no dative, the first is the place object
+            place_object = first_object
+            pick_object = second_object
+
+    if returning_default:
+        print(f"RETURNING DEFAULT: {doc}")
+    pick_object = str(doc[pick_object[0]:pick_object[1]])
+    place_object = str(doc[place_object[0]:place_object[1]])
+    return {'pick': pick_object, 'place': place_object}
+
 
 def get_direct_object_indices(doc):
     direct_object_indices = []

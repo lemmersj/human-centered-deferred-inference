@@ -11,7 +11,7 @@ import io
 import base64
 import spacy
 from spacy import displacy
-from parser_spacy import get_pick_object, get_place_object
+from parser_spacy import extract_all_noun_phrases, separate_pick_and_place
 import wordninja
 import random
 from IPython import embed
@@ -95,10 +95,12 @@ def render_form():
         image_in = Image.open(f"../bottom-up-attention.pytorch/images/{session['cur_image']}.jpg")
         phrase = " ".join(wordninja.split(form.expression.data))
         doc = nlp(phrase)
-        pick_phrase = get_pick_object(doc)
+        noun_phrases = extract_all_noun_phrases(doc)
+        pick_dict = separate_pick_and_place(doc, noun_phrases)
+        pick_phrase = pick_dict['pick']
         pick_bbox = uniter_interface.forward(pick_phrase, session['cur_image'])
 
-        place_phrase = get_place_object(doc)
+        place_phrase = pick_dict['place']
         place_bbox = uniter_interface.forward(place_phrase, session['cur_image'])
         flash(f'{pick_phrase}->{place_phrase}')
         pick_crop = image_in.crop(pick_bbox)
