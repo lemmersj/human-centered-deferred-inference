@@ -77,7 +77,7 @@ class UNITERInterface():
             img_dim=IMG_DIM, mlp=model_opts.mlp)
         self.model.eval()
         self.model.to("cuda")
-    
+
     def forward(self, expression, npz_name):
         """Makes a prediction.
 

@@ -3,6 +3,84 @@ from spacy import displacy
 from IPython import embed
 nlp = spacy.load('en_core_web_trf')
 
+def find_noun_indices(doc):
+    """Finds indices of nouns.
+
+    args:
+        doc: the spacy document
+
+    returns:
+        list of ints.
+    """
+    noun_list = []
+    for i in range(len(doc)):
+        if doc[i].pos_ == "NOUN":
+            noun_list.append(i)
+
+    return noun_list
+
+def propagate_to_dependents(doc, start_idx):
+    """Propagates from a phrase to all its dependents.
+
+    args:
+        doc: the spacy document
+        start_idx: where we start.
+
+    returns:
+        list of all dependent words.
+    """
+    all_dependents_list = [start_idx]
+    updated = True
+    while updated:
+        updated = False
+        for i in range(len(doc)):
+            if i in all_dependents_list:
+                continue
+            if doc[i].head.i in all_dependents_list:
+                all_dependents_list.append(i)
+                updated = True
+    return all_dependents_list
+        
+def extract_all_noun_phrases(doc):
+    """Extracts extended noun chunks.
+
+    This is done by initializing on every noun, and then collecting all words
+    dependent on that noun, all words dependent on that word, etc.
+
+    args:
+        doc: the spacy document.
+
+    returns:
+        list of noun clause indices.
+    """
+    nouns = find_noun_indices(doc)
+    index_ranges = []
+
+    for noun in nouns:
+        index_list = propagate_to_dependents(doc, noun)
+
+        # need to add one to the max value to accomodate for indexing.
+        index_range = [min(index_list), max(index_list)+1]
+        index_ranges.append(index_range)
+
+    # Remove any phrases embedded in other phrases
+    to_remove_indices = []
+    i = 0
+    for idx_range_1 in index_ranges:
+        j = 0
+        for idx_range_2 in index_ranges:
+            if idx_range_1[0] >= idx_range_2[0] and idx_range_1[1] <= idx_range_2[1] and i != j:
+                to_remove_indices.append(i)
+            j += 1
+        i += 1
+    
+    new_idx_range_list = []
+    for i in range(len(index_ranges)):
+        if i not in to_remove_indices:
+            new_idx_range_list.append(index_ranges[i])
+    
+    embed()
+
 def get_direct_object_indices(doc):
     direct_object_indices = []
     for i in range(len(doc)):
@@ -39,6 +117,7 @@ def valid_shift(doc, cur_range, direction):
         if cur_range[1] >= len(doc):
             return False
         proposed_element = doc[cur_range[1]]
+
         if proposed_element.dep_ == "prep" and proposed_element.head.i >= cur_range[0] and proposed_element.head.i < cur_range[1]:
             return True
         if proposed_element.dep_ == "amod" and proposed_element.head.head.i >= cur_range[0] and proposed_element.head.head.i < cur_range[1]:
@@ -56,6 +135,13 @@ def valid_shift(doc, cur_range, direction):
             return True
         if proposed_element.pos_ == "ADJ" and proposed_element.head.i >= cur_range[0] and proposed_element.head.i < cur_range[1]:
             return True
+        if proposed_element.pos_ == "ADP" and proposed_element.dep_ == "prep" and str(proposed_element.head).upper() == "TAKE":
+            # this might be too specific.
+           return True
+        if proposed_element.pos_ == "NOUN" and proposed_element.dep_ == "relcl" and proposed_element.head.i >= cur_range[0] and proposed_element.head.i < cur_range[1]:
+           return True
+
+
     return False
 def expand_phrase(doc, seed):
     start_idx = seed
@@ -85,7 +171,8 @@ def get_pick_object(doc, return_indices=False):
         if len(nominative_subjects) == 1:
             indices = expand_phrase(doc, nominative_subjects[0])
         else:
-            embed()
+            # Failure mode
+            indices = [0, 1]
     elif len(direct_objects) == 1:
         indices = expand_phrase(doc, direct_objects[0])
     elif len(direct_objects) == 2:
@@ -98,7 +185,6 @@ def get_pick_object(doc, return_indices=False):
                 exists_dative = True
                 dative_loc = i
                 head_loc = doc[i].head.i
-
         # if a dative exists, the target phrase is between it and its head.
         # TODO: If there are two datives?
         if exists_dative:
@@ -134,6 +220,7 @@ def clean_edges(doc, edges):
     edges[1] = i+1
 
     return edges
+
 def get_place_object(doc):
     # Let's try the easy thing first. Figure out what the pick object is, then
     # find other objects.
@@ -152,12 +239,14 @@ def get_place_object(doc):
         referring_expressions.append(expand_phrase(doc, noun_index))
 
     if len(referring_expressions) == 0:
-        embed()
-
+        # failure mode
+        referring_expressions = [[0, 1]]
+    
     target_refexp = referring_expressions[0]
     for referring_expression in referring_expressions:
         if referring_expression != target_refexp:
-            embed()
+            referring_expressions = [[0, 1]]
+            # FAILURE MODE
 
     indices = clean_edges(doc, target_refexp) 
     return str(doc[indices[0]:indices[1]])
