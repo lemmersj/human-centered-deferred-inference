@@ -3,6 +3,33 @@ from spacy import displacy
 from IPython import embed
 nlp = spacy.load('en_core_web_trf')
 
+def expand_based_on_direction_words(doc, start, end, direction_words):
+    """expands based on "direction words" (left, right, top, bottom, etc)
+
+    searches from start---the end of the previous noun clause---to end---
+    the beginning of the next.
+
+    args:
+        doc: spacy document
+        start: start index
+        end: search end index (inclusive)
+        direction_words: words to find
+
+    returns:
+        the index corresponding to the last point where a direction word existed.
+    """
+    return start
+    last_found = start
+
+    for word in direction_words:
+        word_word_count = len(word.split(" "))
+        for i in range(start, end+2-word_word_count):
+            if str(doc[i:i+word_word_count]).lower() == word:
+                if i + word_word_count > last_found:
+                    last_found = i+word_word_count
+
+    return last_found
+
 def in_range(i, search_range):
     """checks if i is in search range (inclusive bottom, exclusive top)
 
@@ -95,23 +122,49 @@ def extract_all_noun_phrases(doc):
 
     idx_range_list = new_idx_range_list
 
-    # blend adjacent direction words
     new_idx_range_list = []
-    skip = False
+    skip_next = False
     for i in range(len(idx_range_list)-1):
-        if skip:
-            skip = False
+        if len(idx_range_list) == 2:
+            new_idx_range_list = idx_range_list
+            break
+        if skip_next:
+            skip_next = False
             continue
-        for directional_word in directional_words:
-            if directional_word in str(doc[idx_range_list[i][1]:idx_range_list[i+1][0]+1]):
-                new_idx_range_list.append((
-                    idx_range_list[i][0], idx_range_list[i+1][1]))
-                skip = True
-                break
-        if not skip:
-            new_idx_range_list.append(idx_range_list[i])
-    if not skip:
+        this_start = idx_range_list[i][1]
+        this_end = idx_range_list[i+1][0]
+        #if this_start == this_end:
+        #    new_idx_range_list.append(idx_range_list[i])
+        #    continue
+        expanded_end = expand_based_on_direction_words(
+            doc, this_start, this_end, directional_words)
+
+        if expanded_end == this_end+1:
+            expanded_end = idx_range_list[i+1][1]
+            skip_next = True
+
+        new_idx_range_list.append([idx_range_list[i][0], expanded_end])
+
+    if not skip_next:
         new_idx_range_list.append(idx_range_list[-1])
+
+    # blend adjacent direction words
+    #new_idx_range_list = []
+    #skip = False
+    #for i in range(len(idx_range_list)-1):
+    #    if skip:
+    #        skip = False
+    #        continue
+    #    for directional_word in directional_words:
+    #        if directional_word in str(doc[idx_range_list[i][1]:idx_range_list[i+1][0]+1]):
+    #            new_idx_range_list.append((
+    #                idx_range_list[i][0], idx_range_list[i+1][1]))
+    #            skip = True
+    #            break
+    #    if not skip:
+    #        new_idx_range_list.append(idx_range_list[i])
+    #if not skip:
+    #    new_idx_range_list.append(idx_range_list[-1])
     idx_range_list = new_idx_range_list
     # The length should be two. If not, let's figure it out.
     if len(idx_range_list) > 2:
@@ -122,11 +175,12 @@ def extract_all_noun_phrases(doc):
         # so find adpositions between two noun clauses.
         # See which noun clauses are separated by one word, and combine if
         # that word is an adpositon.
+        embed()
         one_word_sep = []
         one_word_sep_flat = []
         for i in range(len(idx_range_list)):
             for j in range(len(idx_range_list)):
-                if idx_range_list[i][0] - idx_range_list[j][1] == 1:
+                if idx_range_list[i][0] - idx_range_list[j][1] == 1 and doc[idx_range_list[i][0]].dep_ != "dative":
                     one_word_sep.append([i, j])
                     one_word_sep_flat.append(i)
                     one_word_sep_flat.append(j)
@@ -146,26 +200,50 @@ def extract_all_noun_phrases(doc):
                     idx_range_list_new.append((min(combined_range), max(combined_range)))
             idx_range_list = idx_range_list_new
         else:
+            # Let's run a second directional word pass, but this time to the
+            # end of the next noun phrase.
+            skip_next = False
+            new_idx_range_list = []
+            for j in range(len(idx_range_list)-1):
+                if skip_next:
+                    skip_next = False
+                    continue
+                this_start = idx_range_list[j][1]
+                this_end = idx_range_list[j+1][1]
+                #if this_start == this_end:
+                #    new_idx_range_list.append(idx_range_list[i])
+                #    continue
+                expanded_end = expand_based_on_direction_words(
+                    doc, this_start, this_end, directional_words)
+
+                
+                if expanded_end == this_end:
+                    expanded_end = idx_range_list[j+1][1]
+                    skip_next = True
+
+                new_idx_range_list.append([idx_range_list[j][0], expanded_end])
+
+            if not skip_next:
+                new_idx_range_list.append(idx_range_list[-1])
+
             # we have some ambiguity now. If there's a directional word, the
             # phrase probably goes with the one before.
-            
-            join_indices = []
-            join_indices_flat = []
-            for pair in one_word_sep:
-                for word in directional_words:
-                    idx_range = idx_range_list[max(pair)]
-                    if word in str(doc[idx_range[0]:idx_range[1]]):
-                        join_indices.append(pair)
-                        join_indices_flat += pair
+            idx_range_list = new_idx_range_list 
+            #for pair in one_word_sep:
+            #    for word in directional_words:
+            #        idx_range = idx_range_list[max(pair)]
+            #        if word in str(doc[idx_range[0]:idx_range[1]]):
+            #            join_indices.append(pair)
+            #            join_indices_flat += pair
 
-            for pair in join_indices:
-                combined_range = idx_range_list[pair[0]]+idx_range_list[pair[1]]
-                idx_range_list_new.append([min(combined_range), max(combined_range)])
-            for i in range(len(idx_range_list)):
-                if i not in join_indices_flat:
-                    idx_range_list_new.append(idx_range_list[i])
+            #for pair in join_indices:
+            #    combined_range = idx_range_list[pair[0]]+idx_range_list[pair[1]]
+            #    idx_range_list_new.append([min(combined_range), max(combined_range)])
+            #for i in range(len(idx_range_list)):
+            #    if i not in join_indices_flat:
+            #        idx_range_list_new.append(idx_range_list[i])
 
-            idx_range_list = idx_range_list_new
+            #idx_range_list = idx_range_list_new
 
     return idx_range_list
 
