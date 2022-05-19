@@ -15,6 +15,7 @@ from parser_spacy import extract_all_noun_phrases, separate_pick_and_place
 import wordninja
 import random
 from IPython import embed
+import scenario_manager 
 import numpy as np
 
 app = Flask(__name__)
@@ -47,7 +48,6 @@ def render_form():
     
     #if form.validate_on_submit():
     #    session['mode'] = "infer"
-    print(session['mode'])
     if session['mode'] == "start":
         which_image, which_bbox = get_image_and_bbox()
         session['cur_image'] = which_image

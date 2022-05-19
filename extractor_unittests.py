@@ -5,7 +5,7 @@
 
 import spacy
 from spacy import displacy
-from parser_spacy import get_pick_object, get_place_object, extract_all_noun_phrases, separate_pick_and_place
+from parser_spacy import extract_all_noun_phrases, separate_pick_and_place
 
 phrases = ["give the green bananas to the man in glasses",
            "to the lady in the yellow scarf give the green bananas",
@@ -29,6 +29,15 @@ phrases = ["give the green bananas to the man in glasses",
            "give the mug on the left to the orange in front",
            "give the woman on the bottom right to the third woman from right in the back row",
            "put the mug on the bottom left on the adjacent knife",
+           "put the garlic grinder on top of the blue book",
+           "give the man in the blue shirt to the bicycle closer to the wall",
+           "second sheep on right -> man in orange",
+           "put the brownie in front in the lime-aid glass in back",
+           "put the table in the cup in the center",
+           "wash the left sink in the center sink",
+           "take number 15 to the man with the ball",
+           "please put the woman wearing sunglasses on the boy's tie",
+           "put the woman in the blue shirt next to the man in the red and black shirt on the bicycle closest to us."
            #"oranges, lady in yellow" TODO (Maybe)
           ]
 pick_objects = ["the green bananas", 
@@ -50,7 +59,17 @@ pick_objects = ["the green bananas",
                 "the mug on the left",
                 "the mug on the left",
                 "the woman on the bottom right",
-               "the mug on the bottom left"] #"the fuzzy hand", 
+               "the mug on the bottom left",
+               "the garlic grinder",
+               "the man in the blue shirt",
+               "second",
+               "the brownie in front",
+               "the table",
+               "the left sink",
+               "number 15",
+               "the woman wearing sunglasses",
+                "the woman in the blue shirt next to the man in the red and black shirt"
+               ] #"the fuzzy hand", 
 
 place_objects = ["the man in glasses",
                  "the lady in the yellow scarf",
@@ -72,18 +91,30 @@ place_objects = ["the man in glasses",
                  "the orange in front",
                  "the orange in front",
                  "the third woman from right in the back row",
-                 "the adjacent knife"
+                 "the adjacent knife",
+                 "the blue book",
+                 "the bicycle closer to the wall",
+                 "second",
+                 "the lime-aid glass in back",
+                 "the cup in the center",
+                 "the center sink",
+                 "the man with the ball",
+                 "the boy's tie",
+                 "the bicycle closest to us"
                 ]
 nlp = spacy.load('en_core_web_trf')
 pick_failures = 0
 place_failures = 0
 total = 0
 for i in range(len(phrases)):
-    print(phrases[i])
     total += 1
     phrase_doc = nlp(phrases[i])
-    noun_phrases = extract_all_noun_phrases(phrase_doc)
-    pick_dict = separate_pick_and_place(phrase_doc, noun_phrases) 
+    try:
+        noun_phrases = extract_all_noun_phrases(phrase_doc)
+        pick_dict = separate_pick_and_place(phrase_doc, noun_phrases)
+    except:
+        from IPython import embed
+        embed()
     #print(phrase_doc)
     #print(f"pick: {phrase_doc[pick_dict['pick'][0]:pick_dict['pick'][1]]}")
     #print(f"place: {phrase_doc[pick_dict['place'][0]:pick_dict['place'][1]]}")
