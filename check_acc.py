@@ -20,7 +20,7 @@ UNITER_interface = UNITERInterface()
 model = dbo.get_model_ids("UNITER", "gt")[0]
 
 # Now we want our temp table
-temptable = dbo.get_temp_table(model, dbo.distribution_to_idx("softmax"), "val")
+temptable = dbo.get_temp_table(model, dbo.distribution_to_idx("softmax"), "testB")
 dbo.cur.execute(f"SELECT sentence_target as target, outputs_detections as 'detections [detections]', outputs_sentence as sentence FROM {temptable}")
 all_rows = dbo.cur.fetchall()
 
@@ -37,7 +37,7 @@ for row in all_rows:
     loc_string_jpg = loc_string+".jpg"
     loc_string_npz = loc_string+".npz"
 
-    guess = UNITER_interface.forward(sentence_text, loc_string)
+    _, guess = UNITER_interface.forward(sentence_text, loc_string)
     iou = computeIoU([img_loc['tlx'], img_loc['tly'], img_loc['brx'],
                       img_loc['bry']], guess)
     if iou > 0.5:

@@ -37,7 +37,13 @@ phrases = ["give the green bananas to the man in glasses",
            "wash the left sink in the center sink",
            "take number 15 to the man with the ball",
            "please put the woman wearing sunglasses on the boy's tie",
-           "put the woman in the blue shirt next to the man in the red and black shirt on the bicycle closest to us."
+           "put the woman in the blue shirt next to the man in the red and black shirt on the bicycle closest to us.",
+           "sit the white dog on the brown couch",
+           "put the fork on the left on the table beneath the trays",
+           "give the powdered donut to the donut with coconut shavings",
+           "put the plate furthest from the camera into the sink on the right",
+           "put the wine glass all the way on the right into the sink in the counter",
+           "put the plate furthest from the camera into the sink on the right",
            #"oranges, lady in yellow" TODO (Maybe)
           ]
 pick_objects = ["the green bananas", 
@@ -68,7 +74,13 @@ pick_objects = ["the green bananas",
                "the left sink",
                "number 15",
                "the woman wearing sunglasses",
-                "the woman in the blue shirt next to the man in the red and black shirt"
+                "the woman in the blue shirt next to the man in the red and black shirt",
+                "the white dog",
+                "the fork on the left",
+                "the powdered donut",
+                "the plate furthest from the camera",
+                "the wine glass all the way on the right",
+                "the plate furthest from the camera"
                ] #"the fuzzy hand", 
 
 place_objects = ["the man in glasses",
@@ -100,7 +112,13 @@ place_objects = ["the man in glasses",
                  "the center sink",
                  "the man with the ball",
                  "the boy's tie",
-                 "the bicycle closest to us"
+                 "the bicycle closest to us",
+                 "the brown couch",
+                 "the table beneath the trays",
+                 "the donut with coconut shavings",
+                 "the sink on the right",
+                 "the sink in the counter",
+                 "the sink on the right"
                 ]
 nlp = spacy.load('en_core_web_trf')
 pick_failures = 0

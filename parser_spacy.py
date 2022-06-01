@@ -2,10 +2,26 @@ import spacy
 from spacy import displacy
 from IPython import embed
 from copy import deepcopy
+import pdb
 nlp = spacy.load('en_core_web_trf')
 
-directional_words = ["on top", "left", "right", "top", "bottom", "from right", "from left", "back", "back row", "row", "closer to", "closer", "front", "in front", "center", "next"]
-strip_from_beg_and_end = ["on top of", "top of", "front of"]
+directional_words = ["on top", "left", "right", "top", "bottom", "from right", "from left", "back", "back row", "row", "closer to", "closer", "front", "in front", "center", "next", "on top of", "closest", "furthest", "all", "farthest"]
+strip_from_beg_and_end = ["on top of", "top of", "front of", "closest to", "furthest from"]
+
+def make_grammar_worse(doc):
+    """Makes the grammar worse to more accurately match the training set.
+
+    args:
+        doc: the parsed sentence
+
+    returns:
+        string with determiners removed.
+    """
+    words = []
+    for i in range(len(doc)):
+        if doc[i].pos_ != "DET":
+            words.append(str(doc[i]))
+    return " ".join(words)
 
 def clean_beg_and_end(doc, index_range):
     """removes noise phrases from beginning and end of refexps
@@ -316,9 +332,16 @@ def extract_all_noun_phrases(doc):
 
 
         idx_range_list = new_idx_range_list
+
+    if len(idx_range_list) > 2:
+        for i in range(len(doc)):
+            if doc[i].dep_ == "dative":
+                idx_range_list = [[idx_range_list[0][0],i], [i+1, idx_range_list[-1][1]]]
+                break
+
+
     for i in range(len(idx_range_list)):
         idx_range_list[i] = clean_beg_and_end(doc, idx_range_list[i])
-
     return idx_range_list
 
 def separate_pick_and_place(doc, indices):

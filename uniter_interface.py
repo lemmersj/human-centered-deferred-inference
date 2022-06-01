@@ -8,11 +8,10 @@ from pytorch_pretrained_bert import BertTokenizer
 import torch
 from utils.misc import Struct
 import json
-from IPython import embed
 from PIL import Image, ImageDraw
 import sys
 import flask
-
+import pdb
 import numpy as np
 
 from utils.const import IMG_DIM
@@ -56,17 +55,18 @@ class Tokenizer:
 
 class UNITERInterface():
     """A class that provides an interface to the UNITER architecture."""
-    def __init__(self):
+    def __init__(self, scenario_category):
         """Initializes the network.
 
         args:
-            none
+            scenario_category: tells us where to look on the filesystem
 
         returns:
             none
         """
         self.checkpoint_dir = "net_weights"
         self.tokenizer = Tokenizer()
+        self.scenario_category = scenario_category
         self.hps_file = f'{self.checkpoint_dir}/log/hps.json'
         model_opts = json.load(open(self.hps_file))
         if 'mlp' not in model_opts:
@@ -78,7 +78,7 @@ class UNITERInterface():
         self.model.eval()
         self.model.to("cuda")
 
-    def forward(self, expression, npz_name):
+    def forward(self, expression, npz_name, dropout=False):
         """Makes a prediction.
 
         args:
@@ -88,8 +88,7 @@ class UNITERInterface():
         returns:
             the predicted bbox.
         """
-        data = np.load(f"../bottom-up-attention.pytorch/outdir/{npz_name}.npz")
-        
+        data = np.load(f"../bottom-up-attention.pytorch/extracted_features/{self.scenario_category}/{npz_name}.npz")
         batch = {}
         batch['input_ids'] = self.tokenizer.tokenize_text(expression).unsqueeze(0)
         batch['position_ids'] = torch.arange(batch['input_ids'].shape[1]).unsqueeze(0)
@@ -118,11 +117,23 @@ class UNITERInterface():
             if type(batch[key]) == torch.Tensor:
                 batch[key] = batch[key].to("cuda")
 
+        if dropout:
+            self.model.train()
+            batch['input_ids'] = batch['input_ids'].repeat(50,1)
+            batch['position_ids'] = batch['position_ids'].repeat(50,1)
+            batch['img_feat'] = batch['img_feat'].repeat(50,1,1)
+            batch['txt_lens'] = batch['txt_lens']*50
+            batch['num_bbs'] = batch['num_bbs']*50
+            batch['img_pos_feat'] = batch['img_pos_feat'].repeat(50, 1, 1)
+            batch['attn_masks'] = batch['attn_masks'].repeat(50,1)
+            batch['gather_index'] = batch['gather_index'].repeat(50,1)
+            batch['obj_masks'] = batch['obj_masks'].repeat(50,1)
         _, scores = self.model(batch, compute_loss=False)
         scores = scores.softmax(dim=1)
-        selection = scores.argmax(dim=1)
-        chosen_bbox = data['bbox'][selection]
+        scores = scores.mean(dim=0)
+        selection = scores.argmax(dim=0)
+        chosen_bbox = data['bbox'][selection.cpu()]
 
-        return chosen_bbox
+        return scores, chosen_bbox
 
 

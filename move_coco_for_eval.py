@@ -20,7 +20,7 @@ files_that_exist = os.listdir(
 model = dbo.get_model_ids("UNITER", "gt")[0]
 
 # Now we want our temp table
-temptable = dbo.get_temp_table(model, dbo.distribution_to_idx("softmax"), "val")
+temptable = dbo.get_temp_table(model, dbo.distribution_to_idx("softmax"), "testB")
 dbo.cur.execute(f"SELECT sentence_target as target, outputs_detections as 'detections [detections]'  FROM {temptable}")
 all_rows = dbo.cur.fetchall()
 
