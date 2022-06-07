@@ -13,6 +13,7 @@ import io
 import base64
 import spacy
 from spacy import displacy
+import pdb
 from parser_spacy import extract_all_noun_phrases, separate_pick_and_place, make_grammar_worse
 import wordninja
 import random
@@ -20,6 +21,8 @@ from IPython import embed
 from scenario_manager import ScenarioManager
 import numpy as np
 import sys
+from requery import RandomRequery, EntropyRequery, AcceptFirstRequery
+import torch
 
 scenario_category = sys.argv[1]
 
@@ -30,8 +33,18 @@ uniter_interface = UNITERInterface(scenario_category)
 nlp = spacy.load('en_core_web_trf')
 scenario_manager = ScenarioManager(scenario_category)
 
+if sys.argv[2].lower() == "random":
+    requery_fn = RandomRequery(0.8) 
+if sys.argv[2].lower() == "entropy":
+    requery_fn = EntropyRequery(0.75)
+if sys.argv[2].lower() == "first":
+    requery_fn = AcceptFirstRequery(0)
+
 class REForm(FlaskForm):
-    expression = StringField('Request', validators=[DataRequired()])
+    """ The flask form."""
+    #expression = StringField('request', validators=[DataRequired()])
+    expression_pick = StringField('request_pick', validators=[DataRequired()])
+    expression_place = StringField('request_place', validators=[DataRequired()])
     submit = SubmitField("Go")
 
 @app.route("/", methods=['POST', 'GET'])
@@ -45,22 +58,83 @@ def render_form():
         A rendered webpage.
     """
     form = REForm()
-
     # If we don't have a user id, get one and start a new session.
     if 'user_id' not in session:
         session['user_id'] = scenario_manager.get_new_user_id()
-        session['state'] = "start"
+        session['state'] = "awaiting_text"
+        session['pick_belief'] = None
+        session['place_belief'] = None
+        session['rq_depth'] = 0
 
-    
-    #if form.validate_on_submit():
-    #    session['mode'] = "infer"
-    image_loc, pick_goal_bbox, place_goal_bbox = scenario_manager.get_targets(session['user_id'])
+    # Get the targets from the scenario manager.
+    # This contains all of the information that is necessary to render the
+    # webpage.
+    image_loc, pick_goal_bbox, place_goal_bbox = scenario_manager.get_targets(
+        session['user_id'])
 
+    # the scenario manager returns -1 if there are no more scenarios.
     if image_loc == -1:
         return "All scenarios have been completed. Thank you."
 
-    image_in = Image.open(f"../bottom-up-attention.pytorch/images/{scenario_category}/{image_loc}.jpg")
-    if session['state'] == "start":
+    # Load the image. This is used in all instances.
+    image_in = Image.open(
+        f"../bottom-up-attention.pytorch/images/{scenario_category}/{image_loc}.jpg")
+
+    # Are we in the "infer" state? If so, get the output and determine whether
+    # to re-query.
+    if session['state'] == "infer":
+        # Make sure the form is valid
+        if not form.validate_on_submit():
+            session['state'] = "start"
+            return redirect("/")
+    
+        # Get the phrase and extract the two referring expressions
+        #phrase = form.expression.data
+        #print(phrase)
+        #doc = nlp(phrase)
+        #noun_phrases = extract_all_noun_phrases(doc)
+        #pick_dict = separate_pick_and_place(doc, noun_phrases)
+
+        # Perform inference.
+        pick_phrase = form.expression_pick.data #pick_dict['pick']
+        place_phrase = form.expression_place.data #pick_dict['place']
+        flash(f'{pick_phrase}->{place_phrase}')
+        with torch.no_grad():
+            scores_pick, pick_bboxes = uniter_interface.forward(pick_phrase, image_loc, dropout=True, return_all_boxes=True, return_raw_scores=True)
+            scores_pick = (scores_pick/5.1).softmax(dim=0)
+            scores_place, place_bboxes = uniter_interface.forward(place_phrase, image_loc, dropout=True, return_all_boxes=True, return_raw_scores=True)
+            scores_place = (scores_place/5.1).softmax(dim=0)
+
+        if session['pick_belief'] is None:
+            session['pick_belief'] = scores_pick.cpu().numpy().tolist()
+            session['place_belief'] = scores_place.cpu().numpy().tolist()
+        else:
+            tmp_pick_belief = np.array(session['pick_belief'])*scores_pick.cpu().numpy()
+            session['pick_belief'] = (tmp_pick_belief/tmp_pick_belief.sum()).tolist()
+
+            tmp_place_belief = np.array(session['place_belief'])*scores_place.cpu().numpy()
+            session['place_belief'] = (tmp_place_belief/tmp_place_belief.sum()).tolist()
+        flash(scores_pick)
+        flash(session['pick_belief'])
+        flash(scores_place)
+        flash(session['place_belief'])
+        pick_infer_bbox = pick_bboxes[np.array(session['pick_belief']).argmax()]
+        place_infer_bbox = place_bboxes[np.array(session['place_belief']).argmax()]
+        # Determine whether or not to requery
+        requery_pick = requery_fn.should_requery(np.array(session['pick_belief']))
+        requery_place = requery_fn.should_requery(np.array(session['place_belief']))
+
+        print(scores_pick, session['pick_belief'], ((-np.array(session['pick_belief'])*np.log(np.array(session['pick_belief'])))).sum())
+        print(scores_place, session['place_belief'], ((-np.array(session['place_belief'])*np.log(np.array(session['place_belief'])))).sum())
+        # If we want to requery, set the state.
+        if (requery_pick or requery_place) and session['rq_depth'] < 5:
+            session['state'] = "awaiting_text_requery"
+            session['rq_depth'] += 1
+        else:
+            session['state'] = "display_result"
+
+    # If we are awaiting text for either the first time or the re-query
+    if "awaiting_text" in session['state']:
         pick_crop = image_in.crop(pick_goal_bbox)
         place_crop = image_in.crop(place_goal_bbox)
     
@@ -82,30 +156,19 @@ def render_form():
         output.seek(0)
         output.truncate(0)
 
+        if "requery" in session['state']:
+            robot_img = "robot-requery.png"
+        else:
+            robot_img = "robot-query.png"
+
         session['state'] = "infer"
-        
-        return render_template('main.html', title="Meet your robot", form=form, img_data=encoded_img_data.decode('utf-8'), pick_img=encoded_pick_data.decode('utf-8'), place_img=encoded_place_data.decode('utf-8'))
+        return render_template('main.html', title="Meet your robot", form=form, img_data=encoded_img_data.decode('utf-8'), pick_img=encoded_pick_data.decode('utf-8'), place_img=encoded_place_data.decode('utf-8'), robot_img=robot_img)
     
-    if session['state'] == "infer":
-        if not form.validate_on_submit():
-            session['state'] = "start"
-            return redirect("/")
+    if session['state'] == "display_result":
         # TODO: Decide whether it's worth it to have wordninja running.
         # while it can unmush mushed-together words, it also fails sometimes
         # (rarely) notably on the phrase "sit the white dog on the brown couch"
         # phrase = " ".join(wordninja.split(form.expression.data))
-        phrase = form.expression.data
-        print(phrase)
-        doc = nlp(phrase)
-        noun_phrases = extract_all_noun_phrases(doc)
-        pick_dict = separate_pick_and_place(doc, noun_phrases)
-        pick_phrase = pick_dict['pick']
-        scores_pick, pick_infer_bbox = uniter_interface.forward(pick_phrase, image_loc, dropout=True)
-        place_phrase = pick_dict['place']
-        scores_place, place_infer_bbox = uniter_interface.forward(place_phrase, image_loc, dropout=True)
-        print(scores_pick)
-        print(scores_place)
-        flash(f'{pick_phrase}->{place_phrase}')
         pick_infer_crop = image_in.crop(pick_infer_bbox)
         place_infer_crop = image_in.crop(place_infer_bbox)
         output = io.BytesIO()
@@ -139,18 +202,21 @@ def render_form():
         output.truncate(0)
 
         scenario_manager.add_inference(session['user_id'],
-                                      form.expression.data,
-                                      pick_dict['pick'],
-                                      pick_dict['place'],
+                                      f"place the {pick_phrase} in the {place_phrase}",
+                                      pick_phrase,
+                                      place_phrase,
                                       scores_pick,
                                       scores_pick,
                                       scores_place,
                                       scores_place)
 
         has_more = scenario_manager.step(session['user_id'])
+        session['pick_belief'] = None
+        session['place_belief'] = None
+        session['rq_depth'] = 0
         #if not has_more:
         #    return "Complete! Thank you!"
-        session['state'] = "start"
+        session['state'] = "awaiting_text_initial"
         return render_template('inference.html', title="Meet your robot", form=form, img_data=encoded_img_data.decode('utf-8'), pick_img=encoded_pick_data.decode('utf-8'), place_img=encoded_place_data.decode('utf-8'), target_pick_img=pick_target_data.decode('utf-8'), target_place_img=place_target_data.decode('utf-8'))
 
 if __name__ == '__main__':

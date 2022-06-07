@@ -44,6 +44,11 @@ phrases = ["give the green bananas to the man in glasses",
            "put the plate furthest from the camera into the sink on the right",
            "put the wine glass all the way on the right into the sink in the counter",
            "put the plate furthest from the camera into the sink on the right",
+           "put the wine glass closest to the bananas in the sink on the right",
+           "place the yellow fruit into the white appliance against the wall",
+           "place the yellow fruit on the counter into the white appliance at the center of the image",
+           "place the powdered sugar donut on the donut with coconunt flakes",
+           "place the handbag under the woman's arm on the chair to her right"
            #"oranges, lady in yellow" TODO (Maybe)
           ]
 pick_objects = ["the green bananas", 
@@ -80,7 +85,12 @@ pick_objects = ["the green bananas",
                 "the powdered donut",
                 "the plate furthest from the camera",
                 "the wine glass all the way on the right",
-                "the plate furthest from the camera"
+                "the plate furthest from the camera",
+                "the wine glass closest to the bananas",
+                "the yellow fruit",
+                "the yellow fruit on the counter",
+                "the powdered sugar donut",
+                "the handbag under the woman's arm"
                ] #"the fuzzy hand", 
 
 place_objects = ["the man in glasses",
@@ -118,7 +128,12 @@ place_objects = ["the man in glasses",
                  "the donut with coconut shavings",
                  "the sink on the right",
                  "the sink in the counter",
-                 "the sink on the right"
+                 "the sink on the right",
+                 "the sink on the right",
+                 "the white applicance against the wall",
+                 "the white appliance at the center of the image",
+                 "the donut with coconut flakes",
+                 "the chair to her right"
                 ]
 nlp = spacy.load('en_core_web_trf')
 pick_failures = 0

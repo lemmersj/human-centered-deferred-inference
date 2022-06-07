@@ -5,7 +5,7 @@ from copy import deepcopy
 import pdb
 nlp = spacy.load('en_core_web_trf')
 
-directional_words = ["on top", "left", "right", "top", "bottom", "from right", "from left", "back", "back row", "row", "closer to", "closer", "front", "in front", "center", "next", "on top of", "closest", "furthest", "all", "farthest"]
+directional_words = ["on top", "left", "right", "top", "bottom", "from right", "from left", "back", "back row", "row", "closer to", "closer", "front", "in front", "center", "next", "on top of", "closest", "furthest", "all", "farthest", "against"]
 strip_from_beg_and_end = ["on top of", "top of", "front of", "closest to", "furthest from"]
 
 def make_grammar_worse(doc):
@@ -355,7 +355,9 @@ def separate_pick_and_place(doc, indices):
         dict containing keys pick_range and place_range
     """
     # First make sure that there are two indices
-    assert len(indices) == 2
+    if len(indices) > 2:
+        print("INCORRECT NUMBER OF REFERRED OBJECTS. TAKING FIRST AND LAST.")
+        indices = [indices[0], indices[-1]]
 
     returning_default = True
     

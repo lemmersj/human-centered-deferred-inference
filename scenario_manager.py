@@ -1,4 +1,8 @@
-"""a manager for scenarios and tracking participants."""
+"""a manager for scenarios and tracking participants.
+
+Within this manager are several different classes that I found it necessary to
+develop.
+"""
 import os
 import csv
 import random

@@ -78,12 +78,14 @@ class UNITERInterface():
         self.model.eval()
         self.model.to("cuda")
 
-    def forward(self, expression, npz_name, dropout=False):
+    def forward(self, expression, npz_name, dropout=False, return_all_boxes=False, return_raw_scores=False):
         """Makes a prediction.
 
         args:
             expression: the expression in text form.
             target: The name that points at the npz file.
+            dropout: Do we use dropout sampling to produce our guess?
+            return_all_boxes: if false, return the argmax box. Otherwise return all.
 
         returns:
             the predicted bbox.
@@ -129,11 +131,15 @@ class UNITERInterface():
             batch['gather_index'] = batch['gather_index'].repeat(50,1)
             batch['obj_masks'] = batch['obj_masks'].repeat(50,1)
         _, scores = self.model(batch, compute_loss=False)
-        scores = scores.softmax(dim=1)
+        if not return_raw_scores:
+            scores = scores.softmax(dim=1)
         scores = scores.mean(dim=0)
         selection = scores.argmax(dim=0)
         chosen_bbox = data['bbox'][selection.cpu()]
-
-        return scores, chosen_bbox
+        
+        if return_all_boxes:
+            return scores, data['bbox']
+        else:
+            return scores, chosen_bbox
 
 
