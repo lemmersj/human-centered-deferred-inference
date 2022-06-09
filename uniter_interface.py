@@ -93,6 +93,7 @@ class UNITERInterface():
         data = np.load(f"../bottom-up-attention.pytorch/extracted_features/{self.scenario_category}/{npz_name}.npz")
         batch = {}
         batch['input_ids'] = self.tokenizer.tokenize_text(expression).unsqueeze(0)
+        print(batch['input_ids'])
         batch['position_ids'] = torch.arange(batch['input_ids'].shape[1]).unsqueeze(0)
         batch['img_feat'] = torch.tensor(data['x']).unsqueeze(0)
         batch['txt_lens'] = [batch['input_ids'].shape[1]]

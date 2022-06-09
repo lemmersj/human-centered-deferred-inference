@@ -237,6 +237,7 @@ class ScenarioManager():
                                            place_target)
 
         self.user_trackers[user_id].inference_steps.append(new_inference_step)
+        
         with open(f"user_trackers/{user_id}.pkl", "wb") as f:
             pickle.dump(self.user_trackers[user_id], f)
         return True
