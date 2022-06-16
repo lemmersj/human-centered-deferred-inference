@@ -1,0 +1,50 @@
+{% block content %}
+ <!DOCTYPE html>
+<html>
+	<head>
+		<link rel="stylesheet" href="static/style.css" type="text/css">
+	</head>
+	<body>
+		<div class="container">
+		  <div class="child-left">
+				<span>&nbsp;</span>
+			</div>
+			<div class=child-right">
+				<span>&nbsp;</span>
+			</div>
+		</div>
+	</body>
+</html>
+				<!--<div class="float-instructions">
+					<img src="data:image/jpeg;base64,{{  pick_img  }}" style='width:auto;height: 100%; max-height: 100%; max-width: 45%; border-radius: 20px'>
+					<img src="static/images/arrow.png" style='max-height: 100%; max-width: 10%'>
+					<img src="data:image/jpeg;base64,{{  place_img  }}" style='width: auto; height: 100%; max-height: 100%; max-width: 45%; border-radius: 20px; '>
+				</div>
+				<div class="float-stack">
+								<img src="static/images/robot-graphic.png" style="object-fit:contain; height:90%; width: 100%">
+				</div>
+				<div class="float-stack">
+					<form action="" method="post" novalidate>
+					{{ form.hidden_tag() }}
+				  	<p>
+				    	{{ form.expression.label }}<br>
+				    	{{ form.expression(size=32) }}
+				  	</p>
+				    <p>
+						  {{ form.submit() }}
+						</p>
+					</form>
+				</div>
+			</div>
+			<div class="float-child-right" style="float:right">
+			  <center>
+					{%for mesg in get_flashed_messages() %}
+				  {{mesg | safe}}<br>
+					{% endfor %}
+					<img src="data:image/jpeg;base64,{{  img_data  }}" style='max-height: 90%; max-width: 100%; border-radius: 20px; width: auto; height:100%'>
+				</center>
+			</div>
+		</div>
+  </body>
+</html>
+{% endblock %}

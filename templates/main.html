@@ -1,0 +1,39 @@
+{% block content %}
+ <!DOCTYPE html>
+<html>
+	<head>
+		<link rel="stylesheet" href="static/style.css" type="text/css">
+	</head>
+	<body>
+					<div class="container">
+						<div class="child-left">
+							<div class="instructions">
+							<!--<h1> Current Goal: </h1>-->
+								<img src="data:image/jpeg;base64,{{  pick_img  }}" class="pickplace-image">
+								<img src="static/images/arrow.png" style='object-fit:contain; height: 90%; width: 30%;'>
+								<img src="data:image/jpeg;base64,{{  place_img  }}" class="pickplace-image">
+							</div>
+							<center>
+											<img src="static/images/{{ robot_img }}" class="robot-pic">
+							</center>
+							<div class=query-box>
+								<form action="" method="post" novalidate>
+									{{ form.hidden_tag() }}
+									{{form.expression_pick(size=32, autocomplete="off")}}
+									{{form.expression_place(size=32, autocomplete="off")}}
+									  {{ form.submit() }}
+								</form>
+							</div>
+						</div>
+						<div class="child-right">
+								<center>
+								{%for mesg in get_flashed_messages() %}
+								{{mesg | safe}}<br>
+								{% endfor %}
+								<img src="data:image/jpeg;base64,{{  img_data  }}" class="robot-view">
+								</center>
+						</div>
+					</div>
+	</body>
+</html>
+{% endblock %}
