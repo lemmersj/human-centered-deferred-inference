@@ -13,6 +13,18 @@ from uniter_interface import UNITERInterface
 from util.calculation_utils import computeIoU
 import torch
 import pdb
+
+def meets_criteria(counts, targets, accs):
+    if counts < 5:
+        return False
+
+    if len(set(targets)) <= 3:
+        return False
+
+    if np.array(accs).mean() < 0.65:
+        return False
+
+    return True
 split = "testB"
 
 dbo = DatabaseObject()
@@ -32,6 +44,9 @@ total = 0
 all_raw_probs = []
 all_ious = []
 
+loc_string_accs = {}
+loc_string_counts = {}
+loc_string_targets = {}
 # Collect the data.
 for row in all_rows:
     total += 1
@@ -45,9 +60,10 @@ for row in all_rows:
 
     with torch.no_grad():
         probs, guess = UNITER_interface.forward(sentence_text, loc_string, return_raw_scores=True, dropout=False)
-        print(loc_string)
-        #if "000000382620" in loc_string:
-        #    pdb.set_trace()
+        if loc_string not in loc_string_accs:
+            loc_string_accs[loc_string] = []
+            loc_string_targets[loc_string] = []
+            loc_string_counts[loc_string] = len(probs)
         all_raw_probs.append(probs.cpu())
         these_ious = []
         data = np.load(f"../bottom-up-attention.pytorch/extracted_features/{split}/{loc_string}.npz")
@@ -59,8 +75,14 @@ for row in all_rows:
             except:
                 pdb.set_trace()
             these_ious.append(iou)
+        loc_string_targets[loc_string].append(torch.tensor(these_ious).argmax().item())
+        loc_string_accs[loc_string].append(these_ious[probs.argmax()] > 0.5)
         all_ious.append(these_ious)
 
+for key in loc_string_accs:
+    if meets_criteria(loc_string_counts[key], loc_string_targets[key], loc_string_accs[key]):
+        shutil.copy(f"/z/dat/mscoco/images/train2014/{key}.jpg", f"candidate_images_testB/{key}.jpg")
+pdb.set_trace()
 # First, let's calculate accuracy.
 correct = 0
 for cur_refexp in range(len(all_ious)):

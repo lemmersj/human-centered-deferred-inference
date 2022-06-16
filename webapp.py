@@ -36,7 +36,7 @@ scenario_manager = ScenarioManager(scenario_category)
 if sys.argv[2].lower() == "random":
     requery_fn = RandomRequery(0.8) 
 if sys.argv[2].lower() == "entropy":
-    requery_fn = EntropyRequery(0.75)
+    requery_fn = EntropyRequery(0.2)
 if sys.argv[2].lower() == "first":
     requery_fn = AcceptFirstRequery(0)
 
@@ -100,38 +100,38 @@ def render_form():
         place_phrase = form.expression_place.data #pick_dict['place']
         flash(f'{pick_phrase}->{place_phrase}')
         with torch.no_grad():
-            scores_pick, pick_bboxes = uniter_interface.forward(pick_phrase, image_loc, dropout=False, return_all_boxes=True, return_raw_scores=True)
-            scores_pick = (scores_pick/5.1).softmax(dim=0).cpu()
-            scores_place, place_bboxes = uniter_interface.forward(place_phrase, image_loc, dropout=False, return_all_boxes=True, return_raw_scores=True)
-            scores_place = (scores_place/5.1).softmax(dim=0).cpu()
+            scores_pick, pick_bboxes = uniter_interface.forward(pick_phrase, image_loc, dropout=True, return_all_boxes=True, return_raw_scores=False)
+            #scores_pick = (scores_pick/5.1).softmax(dim=0).cpu()
+            scores_place, place_bboxes = uniter_interface.forward(place_phrase, image_loc, dropout=True, return_all_boxes=True, return_raw_scores=False)
+            #scores_place = (scores_place/5.1).softmax(dim=0).cpu()
            
 
         if session['pick_belief'] is None:
             session['pick_belief'] = scores_pick.cpu().numpy().tolist()
             session['place_belief'] = scores_place.cpu().numpy().tolist()
         else:
-            entropy_prev = torch.tensor(session['pick_belief'])
-            entropy_prev = (-entropy_prev*torch.log(entropy_prev)).sum()
-            entropy_cur = (-scores_pick*torch.log(scores_pick)).sum()
-            if entropy_prev > entropy_cur:
-                session['pick_belief'] = scores_pick
+            #entropy_prev = torch.tensor(session['pick_belief'])
+            #entropy_prev = (-entropy_prev*torch.log(entropy_prev)).sum()
+            #entropy_cur = (-scores_pick*torch.log(scores_pick)).sum()
+            #if entropy_prev > entropy_cur:
+            #    session['pick_belief'] = scores_pick
             
-            entropy_prev = torch.tensor(session['place_belief'])
-            entropy_prev = (-entropy_prev*torch.log(entropy_prev)).sum()
-            entropy_cur = (-scores_place*torch.log(scores_place)).sum()
-            if entropy_prev > entropy_cur:
-                session['place_belief'] = scores_place
-            #tmp_pick_belief = np.array(session['pick_belief'])*scores_pick.cpu().numpy()
-            #session['pick_belief'] = (tmp_pick_belief/tmp_pick_belief.sum()).tolist()
+            #entropy_prev = torch.tensor(session['place_belief'])
+            #entropy_prev = (-entropy_prev*torch.log(entropy_prev)).sum()
+            #entropy_cur = (-scores_place*torch.log(scores_place)).sum()
+            #if entropy_prev > entropy_cur:
+            #    session['place_belief'] = scores_place
+            tmp_pick_belief = np.array(session['pick_belief'])*scores_pick.cpu().numpy()
+            session['pick_belief'] = (tmp_pick_belief/tmp_pick_belief.sum()).tolist()
 
-            #tmp_place_belief = np.array(session['place_belief'])*scores_place.cpu().numpy()
-            #session['place_belief'] = (tmp_place_belief/tmp_place_belief.sum()).tolist()
+            tmp_place_belief = np.array(session['place_belief'])*scores_place.cpu().numpy()
+            session['place_belief'] = (tmp_place_belief/tmp_place_belief.sum()).tolist()
         flash(scores_pick)
         flash(session['pick_belief'])
-        flash(max(scores_pick))
+        flash((-torch.tensor(session['pick_belief'])*torch.log(torch.tensor(session['pick_belief']))).sum())
         flash(scores_place)
         flash(session['place_belief'])
-        flash(max(scores_place))
+        flash((-torch.tensor(session['place_belief'])*torch.log(torch.tensor(session['place_belief']))).sum())
         pick_infer_bbox = pick_bboxes[torch.tensor(session['pick_belief']).argmax()]
         place_infer_bbox = place_bboxes[torch.tensor(session['place_belief']).argmax()]
         # Determine whether or not to requery
@@ -141,7 +141,7 @@ def render_form():
         #print(scores_pick, session['pick_belief'], ((-np.array(session['pick_belief'])*np.log(np.array(session['pick_belief'])))).sum())
         #print(scores_place, session['place_belief'], ((-np.array(session['place_belief'])*np.log(np.array(session['place_belief'])))).sum())
         # If we want to requery, set the state.
-        if (requery_pick or requery_place) and session['rq_depth'] < 1:
+        if (requery_pick or requery_place) and session['rq_depth'] < 3:
             session['state'] = "awaiting_text_requery"
             session['rq_depth'] += 1
         else:

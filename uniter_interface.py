@@ -65,6 +65,8 @@ class UNITERInterface():
             none
         """
         self.checkpoint_dir = "net_weights"
+        #self.checkpoint_dir = "../UNITER/refcoco+_weights/False-0.14-cx-gt-1654726884-48000/"
+        #self.checkpoint_dir = "../UNITER/refcocog_weights/False-0.14-cx-gt-1654812306-96000/"
         self.tokenizer = Tokenizer()
         self.scenario_category = scenario_category
         self.hps_file = f'{self.checkpoint_dir}/log/hps.json'
@@ -93,7 +95,6 @@ class UNITERInterface():
         data = np.load(f"../bottom-up-attention.pytorch/extracted_features/{self.scenario_category}/{npz_name}.npz")
         batch = {}
         batch['input_ids'] = self.tokenizer.tokenize_text(expression).unsqueeze(0)
-        print(batch['input_ids'])
         batch['position_ids'] = torch.arange(batch['input_ids'].shape[1]).unsqueeze(0)
         batch['img_feat'] = torch.tensor(data['x']).unsqueeze(0)
         batch['txt_lens'] = [batch['input_ids'].shape[1]]
