@@ -1,14 +1,18 @@
 """Re-Query classes"""
 import random
-import torch
 import numpy as np
 
 class QuasiRandomRequery():
+    """A class that performs quasi-random deferral.
+    That is, we defer randomly, but change the probability so that every
+    setting has the correct number of deferrals by the end.
+    """
     def __init__(self, threshold, num_samples=50):
         """The initializer.
 
         args:
-            threshold: threshold for re-query. Since we're using uniform random, this is also the probability that the query is accepted.
+            threshold: threshold for re-query. Since we're using uniform random,
+            this is also the probability that the query is accepted.
         """
         self.threshold = threshold
         self.num_samples = num_samples
@@ -44,11 +48,13 @@ class QuasiRandomRequery():
         return random_val < actual_p
 
 class RandomRequery():
+    """Defers randomly based on some probability"""
     def __init__(self, threshold):
         """The initializer.
 
         args:
-            threshold: threshold for re-query. Since we're using uniform random, this is also the probability that the query is accepted.
+            threshold: threshold for re-query. Since we're using uniform random,
+            this is also the probability that the query is accepted.
         """
         self.threshold = threshold
 
@@ -66,6 +72,7 @@ class RandomRequery():
         return random_val > self.threshold
 
 class AcceptFirstRequery():
+    """Never defer."""
     def __init__(self, threshold):
         """The initializer.
 
@@ -86,6 +93,7 @@ class AcceptFirstRequery():
         return False
 
 class EntropyRequery():
+    """Defer based on distribution entropy"""
     def __init__(self, threshold):
         """The initializer.
 
