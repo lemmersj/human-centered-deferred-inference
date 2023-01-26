@@ -1,19 +1,13 @@
-"""A webapp from which to run UNITER.
-
-Will be built up slowly for the putative CHI2023 paper.
+"""
+A straightforward object-like interface to UNITER.
 """
 
-from model.re_sigmoid_det_dual import UniterForReferringExpressionComprehension
-from pytorch_pretrained_bert import BertTokenizer
-import torch
-from utils.misc import Struct
 import json
-from PIL import Image, ImageDraw
-import sys
-import flask
-import pdb
+import torch
 import numpy as np
-
+from pytorch_pretrained_bert import BertTokenizer
+from model.re_sigmoid_det_dual import UniterForReferringExpressionComprehension
+from utils.misc import Struct
 from utils.const import IMG_DIM
 
 class Tokenizer:
@@ -65,8 +59,6 @@ class UNITERInterface():
             none
         """
         self.checkpoint_dir = "net_weights"
-        #self.checkpoint_dir = "../UNITER/refcoco+_weights/False-0.14-cx-gt-1654726884-48000/"
-        #self.checkpoint_dir = "../UNITER/refcocog_weights/False-0.14-cx-gt-1654812306-96000/"
         self.tokenizer = Tokenizer()
         self.scenario_category = scenario_category
         self.hps_file = f'{self.checkpoint_dir}/log/hps.json'
@@ -121,6 +113,7 @@ class UNITERInterface():
             if type(batch[key]) == torch.Tensor:
                 batch[key] = batch[key].to("cuda")
 
+        # If we do dropout, set the model to train and project the batch
         if dropout:
             self.model.train()
             batch['input_ids'] = batch['input_ids'].repeat(50,1)
@@ -133,15 +126,14 @@ class UNITERInterface():
             batch['gather_index'] = batch['gather_index'].repeat(50,1)
             batch['obj_masks'] = batch['obj_masks'].repeat(50,1)
         _, scores = self.model(batch, compute_loss=False)
+
+        # Softmax the scores unless we have an indication otherwise.
         if not return_raw_scores:
             scores = scores.softmax(dim=1)
         scores = scores.mean(dim=0)
         selection = scores.argmax(dim=0)
         chosen_bbox = data['bbox'][selection.cpu()]
-        
+
         if return_all_boxes:
             return scores, data['bbox']
-        else:
-            return scores, chosen_bbox
-
-
+        return scores, chosen_bbox
