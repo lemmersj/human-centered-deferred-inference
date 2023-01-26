@@ -1,237 +1,400 @@
 """
+Runs the server.
 
-Runs the server."""
+Typical usage:
+    python webapp.py <scenario> <requery criteria>
 
-from flask import Flask, render_template, flash, session, redirect
-from flask_wtf import FlaskForm
-from wtforms import StringField, SubmitField
-from wtforms.validators import DataRequired
-from uniter_interface import UNITERInterface
+"""
 import os
-from PIL import Image, ImageDraw
 import io
 import base64
-import spacy
-from spacy import displacy
 import pdb
-from parser_spacy import extract_all_noun_phrases, separate_pick_and_place, make_grammar_worse
-import wordninja
-import random
-from IPython import embed
-from scenario_manager import ScenarioManager
+import argparse
 import numpy as np
-import sys
-from requery import RandomRequery, EntropyRequery, AcceptFirstRequery
 import torch
+from PIL import Image, ImageDraw
+from flask import Flask, render_template, session, redirect, request
+from flask_wtf import FlaskForm
+from flask_wtf.csrf import CSRFProtect
+from wtforms import StringField, SubmitField, RadioField, SelectField
+from wtforms.validators import DataRequired
+from uniter_interface import UNITERInterface
+from scenario_manager import ScenarioManager
+from util import calculation_utils
+#from werkzeug.middleware.proxy_fix import ProxyFix
+import json
+from waitress import serve
 
-scenario_category = sys.argv[1]
+csrf = CSRFProtect()
 
+parser = argparse.ArgumentParser()
+parser.add_argument("--scenario_category", type=str, required=True)
+parser.add_argument("--consent_form", type=str, required=True, choices=["mturk", "regular"])
+parser.add_argument("--rqd_constraint", type=int, required=True)
+args = parser.parse_args()
+
+# Initialize flask
 app = Flask(__name__)
-SECRET_KEY = os.environ.get('SECRET_KEY')
-app.config['SECRET_KEY'] = SECRET_KEY
-uniter_interface = UNITERInterface(scenario_category)
-nlp = spacy.load('en_core_web_trf')
-scenario_manager = ScenarioManager(scenario_category)
 
-if sys.argv[2].lower() == "random":
-    requery_fn = RandomRequery(0.8) 
-if sys.argv[2].lower() == "entropy":
-    requery_fn = EntropyRequery(0.2)
-if sys.argv[2].lower() == "first":
-    requery_fn = AcceptFirstRequery(0)
+SECRET_KEY = "test_secret_key" #os.environ.get('SECRET_KEY')
+app.config['SECRET_KEY'] = SECRET_KEY
+app.config['TEMPLATES_AUTO_RELOAD'] = True
+# https://flask.palletsprojects.com/en/2.2.x/deploying/proxy_fix/
+#app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+# Initialize the interface to UNITER
+uniter_interface = UNITERInterface(args.scenario_category)
+
+# Initialize the scenario manager
+# this returns images and targets.
+scenario_manager = ScenarioManager(args.scenario_category)
 
 class REForm(FlaskForm):
     """ The flask form."""
-    #expression = StringField('request', validators=[DataRequired()])
-    expression_pick = StringField('request_pick', validators=[DataRequired()])
-    expression_place = StringField('request_place', validators=[DataRequired()])
+    expression = StringField(
+        'request', validators=[DataRequired()],
+        default="", render_kw={'autofocus': True})
     submit = SubmitField("Go")
 
-@app.route("/", methods=['POST', 'GET'])
-def render_form():
-    """Loads the main page.
+class SurveyForm(FlaskForm):
+    """ The flask form."""
+    accuracy = RadioField(
+        'accuracy', validators=[DataRequired()],choices=[('1','1'),('2','2'),('3','3'),('4','4'),('5','5'),('6','6'),('7','7')])
+    rqr_satisfaction = RadioField(
+        'rqr_satisfaction', validators=[DataRequired()],choices=[('1','1'),('2','2'),('3','3'),('4','4'),('5','5'),('6','6'),('7','7')])
+    #rqd_satisfaction = RadioField(
+    #    'rqd_satisfaction', validators=[DataRequired()],choices=[('1','1'),('2','2'),('3','3'),('4','4'),('5','5'),('6','6'),('7','7')])
+    submit = SubmitField("Submit Response", render_kw={'disabled': 'disabled'})
 
+class PreSurveyForm(FlaskForm):
+    """ The flask form."""
+    age_choices = [*range(18,100)]
+    age_choices = list(zip(age_choices, age_choices))
+    age_choices = [(None, '')] + age_choices + [("np", "Prefer not to state")]
+    age_select = SelectField('age', choices=age_choices, validators=[DataRequired()], default='')
+    gender_select = SelectField('gender', choices=[(None,''), ("male","Male"), ("female","Female"), ("nb","Non-Binary/Other"),("np","Prefer not to state")], validators=[DataRequired()], default='')
+    tech_competence = RadioField(
+        'tech_competence', validators=[DataRequired()],choices=[('1','1'),('2','2'),('3','3'),('4','4'),('5','5'),('6','6'),('7','7')])
+    cva_competence = RadioField(
+        'cva_competence', validators=[DataRequired()],choices=[('1','1'),('2','2'),('3','3'),('4','4'),('5','5'),('6','6'),('7','7')])
+    alexa_use = RadioField(
+        'alexa_use', validators=[DataRequired()],choices=[('1','1'),('2','2'),('3','3'),('4','4')])
+    siri_use = RadioField(
+        'siri_use', validators=[DataRequired()],choices=[('1','1'),('2','2'),('3','3'),('4','4')])
+    google_use = RadioField(
+        'google_use', validators=[DataRequired()],choices=[('1','1'),('2','2'),('3','3'),('4','4')])
+    cortana_use = RadioField(
+        'cortana_use', validators=[DataRequired()],choices=[('1','1'),('2','2'),('3','3'),('4','4')])
+    bixby_use = RadioField(
+        'bixby_use', validators=[DataRequired()],choices=[('1','1'),('2','2'),('3','3'),('4','4')])
+   
+    submit = SubmitField("Submit Response",render_kw={'disabled': 'disabled'})
+
+@app.route("/", methods=["GET"])
+def start_experiment():
+    """Decide where to go"""
+    # If the user is done, don't let anything else happen.
+    if 'user_id' in session and session['state'] == "complete":
+        return render_template("complete.html")
+
+    if 'user_id' not in session:
+        # Don't let mutiple sessions run simultaneously
+        if scenario_manager.current_rqr_idx + scenario_manager.current_rqr_idx_count > 0:
+            return "Another user is currently in the system. Please talk to the test administrator."
+        session['user_id'] = scenario_manager.get_new_user_id()
+        session['state'] = "consent_form"
+        session['belief'] = None
+        session['rq_depth'] = 0
+    elif 'user_id' in session and scenario_manager.user_id is None:
+        print("Loading user")
+        scenario_manager.load_user(session['user_id'])
+
+    if session['state'] == "consent_form":
+        return redirect("consent_form")
+    elif session['state'] == "instructions":
+        return redirect("instructions")
+    elif session['state'] == "pre_survey":
+        return redirect("pre_survey")
+    else:
+        return redirect("interface")
+
+@app.route("/consent_form", methods=['POST', 'GET'])
+def render_consent():
+    """Loads the consent form. First step in the study.
+
+    args:
+        none
+
+    returns:
+        rendered consent form. mturk form if mturk, consent_regular if not.
+    """
+    if 'user_id' not in session:
+        print("Redirecting to root")
+        return redirect("/")
+    if 'user_id' in session and session['state'] == "complete":
+        return render_template("complete.html")
+    session['state'] = "consent_form"
+    if args.consent_form == "mturk":
+        return render_template('consent_mturk.html')
+    return render_template('consent_regular.html')
+
+@app.route("/setting")
+def render_setting():
+    """Tells the user the current setting of the study."""
+    if 'user_id' not in session:
+        print("Redirecting to root")
+        return redirect("/")
+    if 'user_id' in session and session['state'] == "complete":
+        return render_template("complete.html")
+    session['state'] = "setting"
+    return render_template('setting.html', setting_num=scenario_manager.current_rqr_idx+1)
+
+@app.route("/instructions")
+def render_instructions():
+    """Draws the instructions. Second step after consent.
+
+    args:
+        none
+
+    returns:
+        rendered instructions.
+    """
+    if 'user_id' not in session:
+        print("Redirecting to root")
+        return redirect("/")
+    if 'user_id' in session and session['state'] == "complete":
+        return render_template("complete.html")
+    session['state'] = "instructions"
+    return render_template('instructions.html')
+
+@app.route("/validate_mid_survey", methods=['POST'])
+@csrf.exempt
+def validate_midsurvey():
+    if len(request.json.keys()) < 3:
+        return json.dumps({'valid': False}), 200, {'ContentType':'application/json'}
+    return json.dumps({'valid':True}), 200, {'ContentType':'application/json'} 
+
+@app.route("/validate_pre_survey", methods=['POST'])
+@csrf.exempt
+def validate_presurvey():
+    if len(request.json.keys()) < 10:
+        return json.dumps({'valid': False}), 200, {'ContentType':'application/json'}
+    if request.json['age_select'] == "None" or request.json['gender_select'] == "None":
+        return json.dumps({'valid': False}), 200, {'ContentType':'application/json'}
+    
+    return json.dumps({'valid':True}), 200, {'ContentType':'application/json'} 
+
+@app.route("/pre_survey", methods=['POST','GET'])
+def render_presurvey():
+    if session['state'] == "instructions" or session['state'] == "pre_survey":
+        session['state'] = "pre_survey"
+    else:
+        return redirect("/")
+    if 'user_id' not in session:
+        print("Redirecting to root")
+        return redirect("/")
+    if 'user_id' in session and session['state'] == "complete":
+        return render_template("complete.html")
+    form = PreSurveyForm()
+    if form.validate_on_submit():
+        to_log = {}
+        to_log['age'] = form.age_select.raw_data[0]
+        to_log['gender'] = form.gender_select.raw_data[0]
+        to_log['tech_competence'] = int(form.tech_competence.raw_data[0])
+        to_log['cva_competence'] = int(form.cva_competence.raw_data[0])
+        to_log['alexa_use'] = form.alexa_use.raw_data[0]
+        to_log['siri_use'] = form.siri_use.raw_data[0]
+        to_log['google_use'] = form.google_use.raw_data[0]
+        to_log['cortana_use'] = form.cortana_use.raw_data[0]
+        to_log['bixby_use'] = form.bixby_use.raw_data[0]
+        scenario_manager.log_initial_survey(to_log)
+   
+        session['state'] = "setting"
+        return redirect("setting")
+    return render_template("pre_survey.html", form=form)
+
+@app.route("/survey", methods=['POST','GET'])
+def render_survey():
+    global scenario_manager
+    if 'user_id' not in session:
+        print("Redirecting to root")
+        return redirect("/")
+    if 'user_id' in session and session['state'] == "complete":
+        return render_template("complete.html")
+    form = SurveyForm()
+    if form.validate_on_submit():
+        to_log = {}
+        to_log['acc_satisfaction'] = int(form.accuracy.raw_data[0])
+        to_log['rqr_satisfaction'] = int(form.rqr_satisfaction.raw_data[0])
+        #to_log['rqd_satisfaction'] = int(form.rqd_satisfaction.raw_data[0])
+        scenario_manager.log_survey(to_log)
+  
+        if session['state'] == "last_survey":
+            session['state'] = "complete"
+            scenario_manager = ScenarioManager(args.scenario_category)
+            return render_template("complete.html")
+        session['state'] = "setting"
+        return redirect("setting")
+    return render_template("survey.html", form=form, setting=scenario_manager.current_rqr_idx)
+
+@app.route("/interface", methods=['POST', 'GET'])
+def render_form():
+    """The main interface.
+
+    This abstracts a state machine, with states awaiting_text, awaiting_text_requery,
+    infer, and display_text.
+    
     Args:
         None
 
     Returns:
         A rendered webpage.
     """
+    if 'user_id' not in session:
+        print("Redirecting to root")
+        return redirect("/")
+    if 'user_id' in session and session['state'] == "complete":
+        return render_template("complete.html")
     form = REForm()
     # If we don't have a user id, get one and start a new session.
-    if 'user_id' not in session:
-        session['user_id'] = scenario_manager.get_new_user_id()
-        session['state'] = "awaiting_text"
-        session['pick_belief'] = None
-        session['place_belief'] = None
-        session['rq_depth'] = 0
+    # TODO: allow for continuation of crashed runs.
+    if scenario_manager.user_id is None:
+        return redirect("/")
 
+    if session['state'] == "setting":
+        session['state'] = "awaiting_text_initial"
     # Get the targets from the scenario manager.
     # This contains all of the information that is necessary to render the
     # webpage.
-    image_loc, pick_goal_bbox, place_goal_bbox = scenario_manager.get_targets(
+    image_loc, goal_bbox = scenario_manager.get_targets(
         session['user_id'])
-
-    # the scenario manager returns -1 if there are no more scenarios.
-    if image_loc == -1:
-        return "All scenarios have been completed. Thank you."
+    if image_loc == "COMPLETE":
+        session['state'] = "last_survey"
+        return redirect("survey")
+    if image_loc == "NEW_RQR":
+        return redirect("survey")
 
     # Load the image. This is used in all instances.
     image_in = Image.open(
-        f"../bottom-up-attention.pytorch/images/{scenario_category}/{image_loc}.jpg")
-
+        f"../bottom-up-attention.pytorch/images/{args.scenario_category}/{image_loc}.jpg")
     # Are we in the "infer" state? If so, get the output and determine whether
     # to re-query.
     if session['state'] == "infer":
         # Make sure the form is valid
         if not form.validate_on_submit():
-            session['state'] = "start"
-            return redirect("/")
-    
+            session['state'] = "awaiting_text"
+            return redirect("/interface")
+
         # Get the phrase and extract the two referring expressions
-        #phrase = form.expression.data
-        #print(phrase)
-        #doc = nlp(phrase)
-        #noun_phrases = extract_all_noun_phrases(doc)
-        #pick_dict = separate_pick_and_place(doc, noun_phrases)
-
-        # Perform inference.
-        pick_phrase = form.expression_pick.data #pick_dict['pick']
-        place_phrase = form.expression_place.data #pick_dict['place']
-        flash(f'{pick_phrase}->{place_phrase}')
+        phrase = form.expression.data
         with torch.no_grad():
-            scores_pick, pick_bboxes = uniter_interface.forward(pick_phrase, image_loc, dropout=True, return_all_boxes=True, return_raw_scores=False)
-            #scores_pick = (scores_pick/5.1).softmax(dim=0).cpu()
-            scores_place, place_bboxes = uniter_interface.forward(place_phrase, image_loc, dropout=True, return_all_boxes=True, return_raw_scores=False)
-            #scores_place = (scores_place/5.1).softmax(dim=0).cpu()
-           
+            scores, bboxes = uniter_interface.forward(
+                phrase, image_loc, dropout=True, return_all_boxes=True,
+                return_raw_scores=False)
 
-        if session['pick_belief'] is None:
-            session['pick_belief'] = scores_pick.cpu().numpy().tolist()
-            session['place_belief'] = scores_place.cpu().numpy().tolist()
+        if session['belief'] is None:
+            session['belief'] = scores.cpu().numpy().tolist()
         else:
-            #entropy_prev = torch.tensor(session['pick_belief'])
-            #entropy_prev = (-entropy_prev*torch.log(entropy_prev)).sum()
-            #entropy_cur = (-scores_pick*torch.log(scores_pick)).sum()
-            #if entropy_prev > entropy_cur:
-            #    session['pick_belief'] = scores_pick
-            
-            #entropy_prev = torch.tensor(session['place_belief'])
-            #entropy_prev = (-entropy_prev*torch.log(entropy_prev)).sum()
-            #entropy_cur = (-scores_place*torch.log(scores_place)).sum()
-            #if entropy_prev > entropy_cur:
-            #    session['place_belief'] = scores_place
-            tmp_pick_belief = np.array(session['pick_belief'])*scores_pick.cpu().numpy()
-            session['pick_belief'] = (tmp_pick_belief/tmp_pick_belief.sum()).tolist()
+            tmp_belief = np.array(session['belief'])*scores.cpu().numpy()
+            session['belief'] = (tmp_belief/tmp_belief.sum()).tolist()
 
-            tmp_place_belief = np.array(session['place_belief'])*scores_place.cpu().numpy()
-            session['place_belief'] = (tmp_place_belief/tmp_place_belief.sum()).tolist()
-        flash(scores_pick)
-        flash(session['pick_belief'])
-        flash((-torch.tensor(session['pick_belief'])*torch.log(torch.tensor(session['pick_belief']))).sum())
-        flash(scores_place)
-        flash(session['place_belief'])
-        flash((-torch.tensor(session['place_belief'])*torch.log(torch.tensor(session['place_belief']))).sum())
-        pick_infer_bbox = pick_bboxes[torch.tensor(session['pick_belief']).argmax()]
-        place_infer_bbox = place_bboxes[torch.tensor(session['place_belief']).argmax()]
+        infer_bbox = bboxes[torch.tensor(session['belief']).argmax()]
         # Determine whether or not to requery
-        requery_pick = requery_fn.should_requery(torch.tensor(session['pick_belief']))
-        requery_place = requery_fn.should_requery(torch.tensor(session['place_belief']))
+        if session['rq_depth'] >= args.rqd_constraint:
+            requery = False
+        else:
+            requery = scenario_manager.requery_fn.should_requery(
+                torch.tensor(session['belief']))
 
-        #print(scores_pick, session['pick_belief'], ((-np.array(session['pick_belief'])*np.log(np.array(session['pick_belief'])))).sum())
-        #print(scores_place, session['place_belief'], ((-np.array(session['place_belief'])*np.log(np.array(session['place_belief'])))).sum())
+        if calculation_utils.computeIoU(goal_bbox, infer_bbox) >= 0.95:
+            correct = True
+        else:
+            correct = False
+
         # If we want to requery, set the state.
-        if (requery_pick or requery_place) and session['rq_depth'] < 3:
+        if requery:
             session['state'] = "awaiting_text_requery"
             session['rq_depth'] += 1
         else:
             session['state'] = "display_result"
+            scenario_manager.total_inferences += 1
+            scenario_manager.correct_inferences += int(correct)
+            print(scenario_manager.total_inferences, scenario_manager.correct_inferences)
+
+
+        scenario_manager.log({'img':image_loc, 'target':goal_bbox, 'scores': scores.cpu().numpy(), 'belief': session['belief'], 'depth': session['rq_depth']-float(requery), 'phrase':phrase, 'rqd_constraint':args.rqd_constraint,'inference_correct':correct})
 
     # If we are awaiting text for either the first time or the re-query
     if "awaiting_text" in session['state']:
-        pick_crop = image_in.crop(pick_goal_bbox)
-        place_crop = image_in.crop(place_goal_bbox)
-    
+        draw = ImageDraw.Draw(image_in)
+        draw.rectangle(goal_bbox, outline="#00ff00", width=4)
+
         output = io.BytesIO()
-
-        pick_crop.save(output, "PNG")
-        encoded_pick_data = base64.b64encode(output.getvalue())
-       
-        output.seek(0)
-        output.truncate(0)
-        place_crop.save(output, "PNG")
-        encoded_place_data = base64.b64encode(output.getvalue())
-
-        output.seek(0)
-        output.truncate(0)
-        
         image_in.save(output, "PNG")
         encoded_img_data = base64.b64encode(output.getvalue())
         output.seek(0)
         output.truncate(0)
 
         if "requery" in session['state']:
-            robot_img = "robot-requery.png"
+            prompt_text = f"I didn't understand \"{phrase}\". Could you try again?"
         else:
-            robot_img = "robot-query.png"
+            prompt_text = "What would you like to crop?"
 
         session['state'] = "infer"
-        return render_template('main.html', title="Meet your robot", form=form, img_data=encoded_img_data.decode('utf-8'), pick_img=encoded_pick_data.decode('utf-8'), place_img=encoded_place_data.decode('utf-8'), robot_img=robot_img)
-    
-    if session['state'] == "display_result":
-        # TODO: Decide whether it's worth it to have wordninja running.
-        # while it can unmush mushed-together words, it also fails sometimes
-        # (rarely) notably on the phrase "sit the white dog on the brown couch"
-        # phrase = " ".join(wordninja.split(form.expression.data))
-        pick_infer_crop = image_in.crop(pick_infer_bbox)
-        place_infer_crop = image_in.crop(place_infer_bbox)
-        output = io.BytesIO()
+        form.expression.data = ""
+        correct_pct = 0
+        if scenario_manager.total_inferences > 0:
+            correct_pct = int(scenario_manager.correct_inferences/scenario_manager.total_inferences*1000)/10.
+        return render_template(
+            'main.html', form=form, img_data=encoded_img_data.decode('utf-8'),
+            prompt_text=prompt_text,correct=scenario_manager.correct_inferences,total=scenario_manager.total_inferences,pct=correct_pct, setting=scenario_manager.current_rqr_idx+1, length=scenario_manager.targets_per_rqr)
 
-        pick_infer_crop.save(output, "PNG")
-        encoded_pick_data = base64.b64encode(output.getvalue())
-       
-        output.seek(0)
-        output.truncate(0)
-        place_infer_crop.save(output, "PNG")
-        encoded_place_data = base64.b64encode(output.getvalue())
-        
-        output.seek(0)
-        output.truncate(0)
+    if session['state'] == "display_result":
+        draw = ImageDraw.Draw(image_in)
+        draw.rectangle(goal_bbox, outline="#00ff00", width=4)
+
+
+        x_grid = torch.arange(image_in.size[0]).unsqueeze(1).repeat(
+            1, image_in.size[1])
+        y_grid = torch.arange(image_in.size[1]).unsqueeze(0).repeat(
+            image_in.size[0], 1)
+
+        overlay = (x_grid > infer_bbox[0]) * (x_grid < infer_bbox[2]) * (
+            y_grid > infer_bbox[1]) * (y_grid < infer_bbox[3])
+        overlay = 1-overlay.float()
+        new_image_array = np.zeros((
+            overlay.shape[0], overlay.shape[1], 4))
+        new_image_array[:, :, 3] = overlay*200
+        new_image = Image.fromarray(
+            np.uint8(new_image_array).transpose(1,0,2))
+        image_in.paste(new_image, (0, 0), new_image)
+        #draw.rectangle(infer_bbox, outline="yellow")
+        output = io.BytesIO()
         image_in.save(output, "PNG")
         encoded_img_data = base64.b64encode(output.getvalue())
-       
-        pick_target_crop = image_in.crop(pick_goal_bbox)
-        output.seek(0)
-        output.truncate(0)
-        pick_target_crop.save(output, "PNG")
-        pick_target_data = base64.b64encode(output.getvalue())
-
-        place_target_crop = image_in.crop(place_goal_bbox)
-        output.seek(0)
-        output.truncate(0)
-        place_target_crop.save(output, "PNG")
-        place_target_data = base64.b64encode(output.getvalue())
 
         output.seek(0)
         output.truncate(0)
-
-        scenario_manager.add_inference(session['user_id'],
-                                      f"place the {pick_phrase} in the {place_phrase}",
-                                      pick_phrase,
-                                      place_phrase,
-                                      scores_pick,
-                                      scores_pick,
-                                      scores_place,
-                                      scores_place)
 
         has_more = scenario_manager.step(session['user_id'])
-        session['pick_belief'] = None
-        session['place_belief'] = None
+        session['belief'] = None
         session['rq_depth'] = 0
-        #if not has_more:
-        #    return "Complete! Thank you!"
+        if not has_more:
+            return "Complete! Thank you!"
         session['state'] = "awaiting_text_initial"
-        return render_template('inference.html', title="Meet your robot", form=form, img_data=encoded_img_data.decode('utf-8'), pick_img=encoded_pick_data.decode('utf-8'), place_img=encoded_place_data.decode('utf-8'), target_pick_img=pick_target_data.decode('utf-8'), target_place_img=place_target_data.decode('utf-8'))
+
+        if scenario_manager.total_inferences > 0:
+            correct_pct = int(scenario_manager.correct_inferences/scenario_manager.total_inferences*1000)/10.
+
+        color = "red"
+        correctmessage = "Crop performed incorrectly."
+        if correct:
+            color = "green"
+            correctmessage = "Crop performed correctly."
+        return render_template('inference.html', form=form,
+                               img_data=encoded_img_data.decode('utf-8'), bgcolor=color,correct=scenario_manager.correct_inferences,total=scenario_manager.total_inferences,pct=correct_pct,correctmessage=correctmessage,setting=scenario_manager.current_rqr_idx+1, length=scenario_manager.targets_per_rqr)
+    print(session)
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5151, host="0.0.0.0")
+    app.run(debug=False, ssl_context=('/etc/ssl/certs/lens.cert','/etc/ssl/private/key.pem'), port=443, host="0.0.0.0")
+    #app.run(debug=False, port=8000, host="0.0.0.0")
+    #serve(app, host="0.0.0.0", port=8000)
