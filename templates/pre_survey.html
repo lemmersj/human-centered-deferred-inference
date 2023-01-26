@@ -1,0 +1,146 @@
+{% block content %}
+ <!DOCTYPE html>
+ <html>
+	<head>
+		<link rel="stylesheet" href="static/style_survey.css" type="text/css">
+    <style>  
+      th {
+				font-size:12px;
+				width:20%;
+			}	
+    </style>
+		<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+    <script type="text/javascript" language="javascript">
+  		function checkform(){
+				let myform = document.getElementById("myform");
+				let fd = new FormData(myform);
+				var jsonout ={};
+					fd.forEach(function(value, key){
+									jsonout[key] = value
+					});
+					var json =JSON.stringify(jsonout)
+				$.ajax({
+					type:'POST',
+					url:'validate_pre_survey',
+					data:json,
+				  contentType: 'application/json',
+				  processData: false,
+					success: function(response){
+							const parsed = JSON.parse(response)
+  				if (parsed["valid"] == true){
+								document.getElementById("submit").disabled=false;
+								clearInterval(refreshIntervalId)
+					}
+					else {
+								document.getElementById("submit").disabled=true;
+					}
+					}})
+			}
+
+			
+    </script>
+	</head>
+	<body>
+	<div style="width:50vw;margin:auto;border:2px solid #f2f2f2;border-radius:20px;padding:8px;min-width:328px">
+					<center><h3>Please answer the following questions:</h3></center>
+					<center><p>(All required)<p></center>
+  	<form action="" method="post" name="myform" id="myform" novalidate>
+				{{ form.hidden_tag() }}
+				<center>
+					<table style="width:90%"><tr>
+
+													<td style="width:50%"><center>Age: {{ form.age_select() }}</center></td>
+													<td style="width:50%"><center>Gender: {{ form.gender_select() }}</center></td>
+									</tr>
+					</table>
+				</center>
+									
+				<p>I consider myself to be technically adept.
+    			<center>
+		  			<table>
+							<tr>
+							  <td>
+								  <p style="font-size:12px;margin:0px">Strongly Disagree</p></td>
+							  {% for subfield in form.tech_competence%}
+							  <td>{{subfield}}</td>
+							  {%endfor%}
+							  <td><p style="font-size:12px;margin:0px">Strongly Agree</p></td>
+							</tr>
+							<tr>
+							  <td></td>
+								{% for n in range(1, 8) %}
+								<td><center><p style="font-size:10px;margin:0px"> {{n}}</p></center></td>
+								{% endfor %}
+								</td></td>
+							</tr>
+						</table>
+					</center>
+				</p>
+									
+				<p>I am experienced with voice assistants (Alexa, Siri, etc.).
+    			<center>
+		  			<table>
+							<tr>
+							  <td>
+								  <p style="font-size:12px;margin:0px">Strongly Disagree</p></td>
+							  {% for subfield in form.cva_competence%}
+							  <td>{{subfield}}</td>
+							  {%endfor%}
+							  <td><p style="font-size:12px;margin:0px">Strongly Agree</p></td>
+							</tr>
+							<tr>
+							  <td></td>
+								{% for n in range(1, 8) %}
+								<td><center><p style="font-size:10px;margin:0px"> {{n}}</p></center></td>
+								{% endfor %}
+								</td></td>
+							</tr>
+						</table>
+					</center>
+				</p>
+				<p>Please describe how often you use the following voice assistants:</p>
+				<center>
+				<p>
+  				<table border=1 frame=hsides rules=rows>
+	  				<tr>
+  	  				<th></th><th><span>Several times a day</span><th><span>Several times a week</span></th><th><span>1-2 times a week</span></th><th><span>Less</span></th>
+			  		</tr>
+				  	<tr><td>Amazon Alexa</td>
+					    {% for subfield in form.alexa_use%}
+					  	<td><center>{{subfield}}</center></td>
+					  	{%endfor%}
+					  </tr>
+					  <tr><td>Apple Siri</td>
+					    {% for subfield in form.siri_use%}
+						  <td><center>{{subfield}}</center></td>
+						  {%endfor%}
+					  </tr>
+					  <tr><td>Google Assistant</td>
+					    {% for subfield in form.google_use%}
+						  <td><center>{{subfield}}</center></td>
+						  {%endfor%}
+					  </tr>
+					  <tr><td>Microsoft Cortana</td>
+					    {% for subfield in form.cortana_use%}
+						  <td><center>{{subfield}}</center></td>
+						  {%endfor%}
+					  </tr>
+					  <tr><td>Samsung Bixby</td>
+					    {% for subfield in form.bixby_use%}
+						  <td><center>{{subfield}}</center></td>
+						  {%endfor%}
+					  </tr>
+				  </table>
+				</p>
+			</center>
+			<center>
+				<p>{{ form.submit(class_="button") }}</p>
+			</center>
+		</form>
+	</div>
+<script>
+    var refreshIntervalId = window.setInterval(checkform, 100);
+</script>
+</body>
+</html>
+{% endblock %}

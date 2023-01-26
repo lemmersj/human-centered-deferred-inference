@@ -258,7 +258,7 @@ class ScenarioManager():
             return False
         cur_scen = self.user_tracker.cur_scenario
         bboxes = np.load(
-            f"../bottom-up-attention.pytorch/extracted_features/{self.scenario_category}/{self.user_tracker.scenarios[cur_scen]}.npz")['bbox']
+            f"scenario_data/{self.scenario_category}/{self.user_tracker.scenarios[cur_scen]}.npz")['bbox']
 
         with open(f"user_trackers/{user_id}.pkl", "wb") as f:
             pickle.dump(self.user_tracker, f)

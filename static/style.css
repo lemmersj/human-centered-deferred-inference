@@ -1,0 +1,77 @@
+body, html {
+	height: 100%;
+	margin: 0;
+	padding: 0;
+	box-sizing:border-box;
+	overflow:hidden;
+}
+ .button {
+   background-color: #d4d4d4;
+	 border: black;
+	 color: black;
+	 text-align: center;
+	 text-decoration: none;
+	 display: inline-block;
+	 font-size: 16px;
+	 padding: 0px;
+}
+.button:disabled,button[disabled]{
+	opacity:0.25;
+			}
+.container {
+	width:100vw;
+	height:100vh;
+	background-color:#242526;
+	box-sizing: border-box;
+	padding: 0%;
+}
+
+.inner_div{
+	background-color:#e3e3e3b3;
+  position:absolute;
+	top:2vh;
+	left:2vw;
+	width:20vw;
+	height:10vh;
+	border-radius:10px;
+	border-style:solid;
+}
+
+.inner_div_right{
+	background-color:#e3e3e3b3;
+  position:absolute;
+	top:2vh;
+	right:2vw;
+	width:20vw;
+	height:10vh;
+	border-radius:10px;
+	border-style:solid;
+	display: table;
+}
+.robot-view {
+	object-fit: contain;
+	width: 100vw;
+	height: 100vh;
+	border-radius: 0px ;
+	padding: 0%;
+	box-sizing: border-box;
+}
+
+input[type=text] {
+				width: 78%;
+				padding: 12px 20px;
+				margin 8px 0;
+				box-sizing: border-box;
+				border-radius: 5px;
+				vertical-align: middle;
+				font-size: 80%;
+				box-sizing: border-box
+}
+input[type=submit] {
+				width: 20%;
+				padding: 12px 20px;
+				margin 8px 0;
+				box-sizing: border-box;
+				border-radius: 5px;
+				box-sizing: border-box;
+				}

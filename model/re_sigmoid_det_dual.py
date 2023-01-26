@@ -14,7 +14,6 @@ from apex.normalization.fused_layer_norm import FusedLayerNorm as LayerNorm
 
 from .layer import GELU
 from .model import UniterPreTrainedModel, UniterModel
-from IPython import embed
 
 def computeIoU(all_boxes, target_boxes, num_boxes):
     # all_boxes comes in as list of numpy array (for some reason...)

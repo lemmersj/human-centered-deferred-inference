@@ -1,3 +1,6 @@
+## Downloading weights
+Model weights for UNITER can be downloaded [here](https://drive.google.com/file/d/1ybo4jqf63rzM4fY3-VwcJ7VPKtUFZg-S/view?usp=sharing). They should be downloaded to the directory net_weights/ckpt/.
+
 ## Pre-processing images for UNITER
 - Run move_coco_for_eval.py
 - in the bottom-up-attention.pytorch package, run:

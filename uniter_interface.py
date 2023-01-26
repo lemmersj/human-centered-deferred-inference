@@ -92,7 +92,7 @@ class UNITERInterface():
         returns:
             the predicted bbox.
         """
-        data = np.load(f"../bottom-up-attention.pytorch/extracted_features/{self.scenario_category}/{npz_name}.npz")
+        data = np.load(f"scenarios/{self.scenario_category}/features/{npz_name}.npz")
         batch = {}
         batch['input_ids'] = self.tokenizer.tokenize_text(expression).unsqueeze(0)
         batch['position_ids'] = torch.arange(batch['input_ids'].shape[1]).unsqueeze(0)
