@@ -3,19 +3,17 @@
 Within this manager are several different classes that I found it necessary to
 develop.
 """
-import os
 import csv
 import random
-import pdb
 import string
 import pickle
-import numpy as np
-from requery import QuasiRandomRequery, RandomRequery, EntropyRequery, AcceptFirstRequery
 import time
+import numpy as np
+from requery import QuasiRandomRequery
 
 class UserTracker():
     """A class that tracks user-specific data.
-    
+
     This includes information such as the current scenario and step
     (in case of mid-experiment crashes) and all of the information that will
     need to be done for analysis.
@@ -116,7 +114,7 @@ class ScenarioManager():
         in_dict['correct_inferences'] = self.correct_inferences
         in_dict['total_inferences'] = self.total_inferences
         self.user_tracker.inference_steps.append(in_dict)
-    
+
     def log_initial_survey(self, in_dict):
         """Logs a step in the inference process.
 
@@ -140,24 +138,23 @@ class ScenarioManager():
         """
         in_dict['rqr'] = self.rqrs[self.current_rqr_idx-1]
         in_dict['rqr_idx'] = self.current_rqr_idx-1
-        #in_dict['rqr_idx_count'] = self.current_rqr_idx_count
         in_dict['shuffled_rqr'] = self.rqrs
         in_dict['time'] = time.time() - self.start_time
         self.user_tracker.surveys.append(in_dict)
-        
+
         with open(f"user_trackers/{self.user_id}.pkl", "wb") as f:
             pickle.dump(self.user_tracker, f)
 
         # Reset inferences for every condition
         self.correct_inferences = 0
         self.total_inferences = 0
-    
+
     def get_new_user_id(self):
         """Gets a new user id
 
         args:
             none
-        
+
         returns:
             a new unique user id. Additionally initializes the user tracker.
         """
@@ -168,7 +165,7 @@ class ScenarioManager():
         self.user_tracker = UserTracker(self.user_id, self.scenario_dict)
 
         self.user_tracker.cur_scenario = 0
-        
+
         self.user_tracker.cur_image = self.user_tracker.scenarios[0]
         self.user_tracker.target_bbox = random.choice(
             self.scenario_dict[self.user_tracker.cur_image])
@@ -201,7 +198,7 @@ class ScenarioManager():
             self.current_rqr_idx += 1
             if self.current_rqr_idx == len(self.rqrs):
                 return "COMPLETE", "COMPLETE"
-            
+
             self.requery_fn = QuasiRandomRequery(self.rqrs[self.current_rqr_idx], self.targets_per_rqr)
             print(f"rqr idx is now {self.current_rqr_idx}")
             return "NEW_RQR", "NEW_RQR"
