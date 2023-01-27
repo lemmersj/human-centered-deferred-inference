@@ -11,7 +11,7 @@ import os
 import pdb
 import numpy as np
 from prettytable import PrettyTable
-from scipy.stats import gaussian_kde, wilcoxon, fisher_exact
+from scipy.stats import wilcoxon, fisher_exact
 
 from util.calculation_utils import computeIoU
 from util.database_object import DatabaseObject
@@ -37,7 +37,10 @@ phrases_1 = []
 
 # Loop through all of the users
 trackers = os.listdir("user_trackers")
-user_significance_table = PrettyTable(["User","Init Score", "Def Score", "p score", "Score Sig", "Init Len", "Def Len", "p len", "Len Sig", "Init Err", "Def Err", "p err", "Err Sig"])
+user_significance_table = PrettyTable(["User","Init Score", "Def Score",
+                                       "p score", "Score Sig", "Init Len",
+                                       "Def Len", "p len", "Len Sig",
+                                       "Init Err", "Def Err", "p err", "Err Sig"])
 user_significance_table.float_format = '.4'
 for tracker in trackers:
     # keep data for this user.
@@ -61,10 +64,11 @@ for tracker in trackers:
         next_inf_step_idx += 1
         # Skip the initial setting, with no deferral.
         if inference_step['rqr'] == 0:
-           continue
+            continue
 
        # cacluate entropy.
-        entropy = -(np.array(inference_step['scores'])*np.log(np.array(inference_step['scores']))).sum()
+        entropy = -(np.array(inference_step['scores'])*np.log(
+            np.array(inference_step['scores']))).sum()
 
         # Is this an initial query?
         if inference_step['depth'] == 0:
@@ -99,7 +103,10 @@ for tracker in trackers:
             # target.
             match = None
             for result in results:
-                if int(result['tlx']) == int(inference_step['target'][0]) and int(result['tly']) == int(inference_step['target'][1]) and int(result['brx']) == int(inference_step['target'][2]) and int(result['bry']) == int(inference_step['target'][3]):
+                if int(result['tlx']) == int(inference_step['target'][0]) and\
+                   int(result['tly']) == int(inference_step['target'][1]) and\
+                   int(result['brx']) == int(inference_step['target'][2]) and\
+                   int(result['bry']) == int(inference_step['target'][3]):
                     match = result
                     break
             # Get the detections.
@@ -133,13 +140,24 @@ for tracker in trackers:
     contingency_table[1, 0] = (1-np.array(errors_0)).sum()
     contingency_table[1, 1] = (1-np.array(errors_1)).sum()
     statistic, p_value_error = fisher_exact(contingency_table)
-    user_significance_table.add_row([tracker,float(np.array(scores_0).mean()), float(np.array(scores_1).mean()), p_value_scores, p_value_scores < 0.05, float(np.array(length_0).mean()), float(np.array(length_1).mean()), p_value_length, p_value_length < 0.05, float(np.array(errors_0).mean()), float(np.array(errors_1).mean()), p_value_error, p_value_error < 0.05])
+    user_significance_table.add_row([tracker, float(np.array(scores_0).mean()),
+                                     float(np.array(scores_1).mean()),
+                                     p_value_scores, p_value_scores < 0.05,
+                                     float(np.array(length_0).mean()),
+                                     float(np.array(length_1).mean()),
+                                     p_value_length, p_value_length < 0.05,
+                                     float(np.array(errors_0).mean()),
+                                     float(np.array(errors_1).mean()),
+                                     p_value_error, p_value_error < 0.05])
+
 print(user_significance_table)
 max_entropy = max(np.array(depth_0_all).max(),np.array(depth_1_all).max())
 min_entropy = min(np.array(depth_0_all).min(),np.array(depth_1_all).min())
 
-table_all = PrettyTable(["Init Score", "Def Score", "p score", "Score Sig", "Init Len", "Def Len", "p len", "Len Sig", "Init Err", "Def Err", "p err", "Err Sig"])
-table_all.float_format = '.4' 
+table_all = PrettyTable(["Init Score", "Def Score", "p score", "Score Sig",
+                         "Init Len", "Def Len", "p len", "Len Sig", "Init Err",
+                         "Def Err", "p err", "Err Sig"])
+table_all.float_format = '.4'
 
 pval_score = wilcoxon(depth_0_all, depth_1_all).pvalue
 pval_len = wilcoxon(length_0_all, length_1_all).pvalue
