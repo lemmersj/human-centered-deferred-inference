@@ -44,14 +44,18 @@ uniter_interface = UNITERInterface(args.scenario_category)
 scenario_manager = ScenarioManager(args.scenario_category)
 
 class REForm(FlaskForm):
-    """ The flask form for a crop request."""
+    """
+    The flask form for a crop request.
+    """
     expression = StringField(
         'request', validators=[DataRequired()],
         default="", render_kw={'autofocus': True})
     submit = SubmitField("Go")
 
 class SurveyForm(FlaskForm):
-    """ The flask form for the post-setting survey."""
+    """
+    The flask form for the post-setting survey.
+    """
     accuracy = RadioField(
         'accuracy', validators=[DataRequired()],
         choices=[('1','1'),('2','2'),('3','3'),('4','4'),
@@ -65,7 +69,9 @@ class SurveyForm(FlaskForm):
     submit = SubmitField("Submit Response", render_kw={'disabled': 'disabled'})
 
 class PreSurveyForm(FlaskForm):
-    """ The flask form for the pre-experiment survey."""
+    """
+    The flask form for the pre-experiment survey.
+    """
     age_choices = [*range(18,100)]
     age_choices = list(zip(age_choices, age_choices))
     age_choices = [(None, '')] + age_choices + [("np", "Prefer not to state")]
