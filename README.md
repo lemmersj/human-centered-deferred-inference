@@ -2,13 +2,13 @@
 This is the repository for the IUI2023 paper titled: *Human-Centered Deferred Inference: Measuring User Interactions and Setting Deferral Criteria for Human-AI Teams.* If you find this work helpful, please cite:
 
     @inproceedings{lemmer_evaluating_2023,
-		address = {Washington DC, United States},
+	address = {Washington DC, United States},
   	title = {Evaluating and Improving Interactions with Hazy Oracles},
-	  booktitle = {Proceedings of the 2023 International Conference on Intelligent User Interfaces},
-		publisher = {ACM Press},
+	booktitle = {Proceedings of the 2023 International Conference on Intelligent User Interfaces},
+	publisher = {ACM Press},
   	author = {Lemmer, Stephan J. and Guo, Anhong and Corso, Jason J.},
-	  month = March,
-		year = {2023}
+	month = March,
+	year = {2023}
     }
 
 ![A cartoon example of deferred inference](ledefigure-comic.png)
