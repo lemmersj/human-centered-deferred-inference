@@ -2,16 +2,16 @@
 This is the repository for the IUI2023 paper titled: *Human-Centered Deferred Inference: Measuring User Interactions and Setting Deferral Criteria for Human-AI Teams.* If you find this work helpful, please cite:
 
     @inproceedings{lemmer_evaluating_2023,
-		  address = {Washington DC, United States},
-  		title = {Evaluating and Improving Interactions with Hazy Oracles},
-	  	booktitle = {Proceedings of the 2023 International Conference on Intelligent User Interfaces},
-		  publisher = {ACM Press},
-  		author = {Lemmer, Stephan J. and Guo, Anhong and Corso, Jason J.},
-	  	month = March,
-		  year = {2023}
-    	}
+		address = {Washington DC, United States},
+  	title = {Evaluating and Improving Interactions with Hazy Oracles},
+	  booktitle = {Proceedings of the 2023 International Conference on Intelligent User Interfaces},
+		publisher = {ACM Press},
+  	author = {Lemmer, Stephan J. and Guo, Anhong and Corso, Jason J.},
+	  month = March,
+		year = {2023}
+    }
 
-![A cartoon example of deferred inference](ledefigure_comic.png)
+![A cartoon example of deferred inference](ledefigure-comic.png)
 ## Abstract
 Although deep learning holds the promise of novel and impactful interfaces, realizing such promise in practice remains a challenge: since dataset-driven deep-learned models assume a one-time human input, there is no recourse when they do not understand the input provided by the user. Works that address this via deferred inference—soliciting additional human input when uncertain—show meaningful improvement, but ignore key aspects of how users and models interact. In this work, we focus on the role of users in deferred inference and argue that the deferral criteria should be a function of the user and model as a team, not simply the model itself. In support of this, we introduce a novel mathematical formulation, validate it via an experiment analyzing the interactions of 25 individuals with a deep learning-based visiolinguistic model, and identify user-specific dependencies that are under-explored in prior work. We conclude by demonstrating two human-centered procedures for setting deferral criteria that are simple to implement, applicable to a wide variety of tasks, and perform equal to or better than equivalent procedures that use much larger datasets.
 
