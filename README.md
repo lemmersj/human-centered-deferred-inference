@@ -1,14 +1,11 @@
 ## Downloading weights
 Model weights for UNITER can be downloaded [here](https://drive.google.com/file/d/1ybo4jqf63rzM4fY3-VwcJ7VPKtUFZg-S/view?usp=sharing). They should be downloaded to the directory net_weights/ckpt/.
 
-## Pre-processing images for UNITER
-- Run move_coco_for_eval.py
-- in the bottom-up-attention.pytorch package, run:
-`python extract_features.py --mode caffe --num-cpus 32 --gpus '0' --extract-mode bbox_feats --config-file configs/caffe/test-caffe-r101.yaml --image-dir images --bbox-dir boxes --out-dir outdir --resume
+## Download images and features
+download the [images and features](https://drive.google.com/file/d/19xjk7WnDxLLs9IKcE8atA8q9bIDNZith/view?usp=sharing), which should be unzipped to scenarios/iui_2023_scenario
 
-## Checking accuracy
-python check_acc.py
+## Running the webapp
 
-val: reported: 91.64, reimplemented: 89.87 (-1.77)
-testA: reported: 92.26, reimplemented: 91.14 (-1.12)
-testB: reported: 90.46, reimplemented: 88.95 (-1.51)
+## Analysis
+Add the current directory (user-centered-deferred-inference) to the python path. This is necessary for loading scenario manager:
+`export PYTHONPATH=$(pwd)`
