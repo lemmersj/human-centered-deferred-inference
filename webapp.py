@@ -23,6 +23,7 @@ from util import calculation_utils
 
 csrf = CSRFProtect()
 
+# Parse arguments
 parser = argparse.ArgumentParser()
 parser.add_argument("--scenario_category", type=str, required=True)
 parser.add_argument("--consent_form", type=str, required=True, choices=["mturk", "regular"])
@@ -101,13 +102,16 @@ class PreSurveyForm(FlaskForm):
         choices=[('1','1'),('2','2'),('3','3'),('4','4')])
 
     google_use = RadioField(
-        'google_use', validators=[DataRequired()],choices=[('1','1'),('2','2'),('3','3'),('4','4')])
+        'google_use', validators=[DataRequired()],
+        choices=[('1','1'),('2','2'),('3','3'),('4','4')])
 
     cortana_use = RadioField(
-        'cortana_use', validators=[DataRequired()],choices=[('1','1'),('2','2'),('3','3'),('4','4')])
+        'cortana_use', validators=[DataRequired()],
+        choices=[('1','1'),('2','2'),('3','3'),('4','4')])
 
     bixby_use = RadioField(
-        'bixby_use', validators=[DataRequired()],choices=[('1','1'),('2','2'),('3','3'),('4','4')])
+        'bixby_use', validators=[DataRequired()],
+        choices=[('1','1'),('2','2'),('3','3'),('4','4')])
 
     submit = SubmitField("Submit Response",render_kw={'disabled': 'disabled'})
 
@@ -137,12 +141,12 @@ def start_experiment():
     # Redirect based on the user's state.
     if session['state'] == "consent_form":
         return redirect("consent_form")
-    elif session['state'] == "instructions":
+    if session['state'] == "instructions":
         return redirect("instructions")
-    elif session['state'] == "pre_survey":
+    if session['state'] == "pre_survey":
         return redirect("pre_survey")
-    else:
-        return redirect("interface")
+
+    return redirect("interface")
 
 @app.route("/consent_form", methods=['POST', 'GET'])
 def render_consent():
@@ -179,7 +183,8 @@ def render_setting():
     if 'user_id' in session and session['state'] == "complete":
         return render_template("complete.html")
     session['state'] = "setting"
-    return render_template('setting.html', setting_num=scenario_manager.current_rqr_idx+1)
+    return render_template('setting.html',
+                           setting_num=scenario_manager.current_rqr_idx+1)
 
 @app.route("/instructions")
 def render_instructions():
@@ -267,6 +272,7 @@ def render_survey():
     if 'user_id' in session and session['state'] == "complete":
         return render_template("complete.html")
     form = SurveyForm()
+
     # If valid, save the data.
     if form.validate_on_submit():
         to_log = {}
@@ -282,7 +288,8 @@ def render_survey():
         session['state'] = "setting"
         return redirect("setting")
 
-    return render_template("survey.html", form=form, setting=scenario_manager.current_rqr_idx)
+    return render_template("survey.html", form=form,
+                           setting=scenario_manager.current_rqr_idx)
 
 @app.route("/interface", methods=['POST', 'GET'])
 def render_form():
@@ -303,12 +310,14 @@ def render_form():
     if 'user_id' in session and session['state'] == "complete":
         return render_template("complete.html")
     form = REForm()
+
     # If we don't have a user id, get one and start a new session.
     if scenario_manager.user_id is None:
         return redirect("/")
 
     if session['state'] == "setting":
         session['state'] = "awaiting_text_initial"
+
     # Get the targets from the scenario manager.
     # This contains all of the information that is necessary to render the
     # webpage.
@@ -323,6 +332,7 @@ def render_form():
     # Load the image. This is used in all instances.
     image_in = Image.open(
         f"scenarios/{args.scenario_category}/images/{image_loc}.jpg")
+
     # Are we in the "infer" state? If so, get the output and determine whether
     # to re-query.
     if session['state'] == "infer":
@@ -367,10 +377,17 @@ def render_form():
             session['state'] = "display_result"
             scenario_manager.total_inferences += 1
             scenario_manager.correct_inferences += int(correct)
-            print(scenario_manager.total_inferences, scenario_manager.correct_inferences)
+            print(scenario_manager.total_inferences,
+                  scenario_manager.correct_inferences)
 
         # Save the data.
-        scenario_manager.log({'img':image_loc, 'target':goal_bbox, 'scores': scores.cpu().numpy(), 'belief': session['belief'], 'depth': session['rq_depth']-float(requery), 'phrase':phrase, 'rqd_constraint':args.rqd_constraint,'inference_correct':correct})
+        scenario_manager.log({'img':image_loc, 'target':goal_bbox,
+                              'scores': scores.cpu().numpy(),
+                              'belief': session['belief'],
+                              'depth': session['rq_depth']-float(requery),
+                              'phrase':phrase,
+                              'rqd_constraint':args.rqd_constraint,
+                              'inference_correct':correct})
 
     # If we are awaiting text for either the first time or the deferral response...
     if "awaiting_text" in session['state']:
@@ -394,10 +411,17 @@ def render_form():
         form.expression.data = ""
         correct_pct = 0
         if scenario_manager.total_inferences > 0:
-            correct_pct = int(scenario_manager.correct_inferences/scenario_manager.total_inferences*1000)/10.
+            correct_pct = int(
+                scenario_manager.correct_inferences/\
+                scenario_manager.total_inferences*1000)/10.
+
         return render_template(
             'main.html', form=form, img_data=encoded_img_data.decode('utf-8'),
-            prompt_text=prompt_text,correct=scenario_manager.correct_inferences,total=scenario_manager.total_inferences,pct=correct_pct, setting=scenario_manager.current_rqr_idx+1, length=scenario_manager.targets_per_rqr)
+            prompt_text=prompt_text,
+            correct=scenario_manager.correct_inferences,
+            total=scenario_manager.total_inferences, pct=correct_pct,
+            setting=scenario_manager.current_rqr_idx+1,
+            length=scenario_manager.targets_per_rqr)
 
     # If we're displaying a result...
     if session['state'] == "display_result":
@@ -436,17 +460,31 @@ def render_form():
             return "Complete! Thank you!"
         session['state'] = "awaiting_text_initial"
 
+        # If it's not the first inference, calculate the correct percentage
         if scenario_manager.total_inferences > 0:
-            correct_pct = int(scenario_manager.correct_inferences/scenario_manager.total_inferences*1000)/10.
+            correct_pct = int(scenario_manager.correct_inferences/\
+                              scenario_manager.total_inferences*1000)/10.
 
+        # Set message and color based on whether or not inference was correct.
         color = "red"
         correctmessage = "Crop performed incorrectly."
         if correct:
             color = "green"
             correctmessage = "Crop performed correctly."
+
+        # Render the page.
         return render_template('inference.html', form=form,
-                               img_data=encoded_img_data.decode('utf-8'), bgcolor=color,correct=scenario_manager.correct_inferences,total=scenario_manager.total_inferences,pct=correct_pct,correctmessage=correctmessage,setting=scenario_manager.current_rqr_idx+1, length=scenario_manager.targets_per_rqr)
+                               img_data=encoded_img_data.decode('utf-8'),
+                               bgcolor=color,
+                               correct=scenario_manager.correct_inferences,
+                               total=scenario_manager.total_inferences,
+                               pct=correct_pct,
+                               correctmessage=correctmessage,
+                               setting=scenario_manager.current_rqr_idx+1,
+                               length=scenario_manager.targets_per_rqr)
     print(session)
 
 if __name__ == '__main__':
-    app.run(debug=False, ssl_context=('/etc/ssl/certs/lens.cert','/etc/ssl/private/key.pem'), port=443, host="0.0.0.0")
+    app.run(debug=False,
+            ssl_context=('/etc/ssl/certs/lens.cert','/etc/ssl/private/key.pem'),
+            port=443, host="0.0.0.0")
