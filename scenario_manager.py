@@ -32,7 +32,7 @@ class UserTracker():
         self.inference_steps = []
         self.surveys = []
         self.scenarios = [*scenarios]
-        #random.shuffle(self.scenarios)
+        random.shuffle(self.scenarios)
 
 class ScenarioManager():
     """a class for managing scenarios."""
@@ -56,14 +56,22 @@ class ScenarioManager():
         self.correct_inferences = 0
         self.total_inferences = 0
         self.user_id = None
+
+        # Shuffle the deferral rates and set the first setting to DR=0.0
         random.shuffle(self.rqrs)
         self.rqrs = [0.0] + self.rqrs
+
+        # Inference times are set relative, to better anonymize.
         self.start_time = time.time()
 
+        # Defer according to the quasi-random function described in the paper.
         self.requery_fn = QuasiRandomRequery(self.rqrs[0], self.targets_per_rqr)
         print(f"Setting RQR to {self.rqrs[0]}")
 
         # load scenarios
+        # a scenario is a csv file consisting of filenames and target bboxes.
+        # we load it in a dict so that it's grouped by images. In other words,
+        # no user receives multiple targets on the same image.
         with open(f"scenarios/{self.scenario_category}.csv", "r") as infile:
             reader = csv.DictReader(infile)
             for row in reader:
@@ -87,6 +95,9 @@ class ScenarioManager():
             data = pickle.load(infile)
         self.user_tracker = data
         self.user_id = user_id
+
+        # If the user has done anything, load the data. If not, just set the
+        # ids. I believe self.user_tracker should have state and survey info.
         try:
             self.rqd_constraint = data.inference_steps[-1]['rqd_constraint']
             self.rqrs = data.inference_steps[-1]['shuffled_rqr']
@@ -158,18 +169,22 @@ class ScenarioManager():
         returns:
             a new unique user id. Additionally initializes the user tracker.
         """
+        # randomly create a UUID.
         self.user_id = ''.join(random.choices(
             string.ascii_letters + string.digits, k=16))
 
         print("Creating user tracker")
+
+        # Instantiate this in a user_tracker object.
         self.user_tracker = UserTracker(self.user_id, self.scenario_dict)
 
+        # Initialize some parameters in the user tracker.
         self.user_tracker.cur_scenario = 0
-
         self.user_tracker.cur_image = self.user_tracker.scenarios[0]
         self.user_tracker.target_bbox = random.choice(
             self.scenario_dict[self.user_tracker.cur_image])
 
+        # Save the user tracker
         with open(f"user_trackers/{self.user_id}.pkl", "wb") as f:
             pickle.dump(self.user_tracker, f)
         return self.user_id
@@ -189,50 +204,34 @@ class ScenarioManager():
         if scenario >= len(self.scenario_dict):
             return -1, -1, -1
 
+        # Get the target from the user tracker
         image = self.user_tracker.cur_image
         target_bbox = self.user_tracker.target_bbox
 
         print(f"Count: {self.current_rqr_idx_count}")
+
+        # If we have reached the end of the treatment, update the rqr_idx and
+        # rqr_idx_count (which treatment and how many tasks have been done
+        # in the treatment).
         if self.current_rqr_idx_count == self.targets_per_rqr:
             self.current_rqr_idx_count = 0
             self.current_rqr_idx += 1
+
+            # If there are no more treatments, we're done.
             if self.current_rqr_idx == len(self.rqrs):
                 return "COMPLETE", "COMPLETE"
 
-            self.requery_fn = QuasiRandomRequery(self.rqrs[self.current_rqr_idx], self.targets_per_rqr)
+            # Otherwise, we re-initialize the deferral function and tell the
+            # webapp to start a new setting.
+            self.requery_fn = QuasiRandomRequery(
+                self.rqrs[self.current_rqr_idx], self.targets_per_rqr)
             print(f"rqr idx is now {self.current_rqr_idx}")
             return "NEW_RQR", "NEW_RQR"
+
         return image, target_bbox
 
-    def add_inference(self, user_id, unparsed_string, pick_string, place_string, pick_individual, pick_aggregate, place_individual, place_aggregate):
-        """Adds inference data to the InferenceStep
-
-        args:
-            user_id: the user ID
-            unparsed_string: the unparsed string input
-            pick_string: the processed pick string
-            place_string: the processed place string
-            pick_individual: the distribution for this instance of the pick object
-            pick_aggregate: the aggregate pick distribution
-            place_individual: this place distribution
-            place_aggregate: the aggregate place distribution
-
-        returns:
-            None
-        """
-        self.user_tracker.inference_steps[-1].unparsed_strings.append(
-            unparsed_string)
-        self.user_tracker.inference_steps[-1].pick_strs.append(pick_string)
-        self.user_tracker.inference_steps[-1].place_strs.append(place_string)
-        self.user_tracker.inference_steps[-1].pick_indiv_guesses.append(pick_individual)
-        self.user_tracker.inference_steps[-1].pick_aggregated_guesses.append(pick_aggregate)
-        self.user_tracker.inference_steps[-1].place_indiv_guesses.append(place_individual)
-        self.user_tracker.inference_steps[-1].place_aggregated_guesses.append(place_aggregate)
-        self.user_tracker.inference_steps[-1].relative_time = time.time-self.start_time()
-
-
     def step(self, user_id):
-        """Increments to the next step.
+        """Increments to the next step (task within a treatment).
 
         args:
             user_id: the user id
@@ -243,7 +242,8 @@ class ScenarioManager():
         self.user_tracker.cur_scenario += 1
         self.current_rqr_idx_count += 1
 
-        self.user_tracker.cur_image = self.user_tracker.scenarios[self.user_tracker.cur_scenario]
+        self.user_tracker.cur_image = \
+                self.user_tracker.scenarios[self.user_tracker.cur_scenario]
         self.user_tracker.target_bbox = random.choice(
             self.scenario_dict[self.user_tracker.cur_image])
 
@@ -255,7 +255,8 @@ class ScenarioManager():
             return False
         cur_scen = self.user_tracker.cur_scenario
         bboxes = np.load(
-            f"scenario_data/{self.scenario_category}/{self.user_tracker.scenarios[cur_scen]}.npz")['bbox']
+            f"scenario_data/{self.scenario_category}/"\
+            f"{self.user_tracker.scenarios[cur_scen]}.npz")['bbox']
 
         with open(f"user_trackers/{user_id}.pkl", "wb") as f:
             pickle.dump(self.user_tracker, f)
