@@ -59,6 +59,8 @@ download the [images and features](https://drive.google.com/file/d/19xjk7WnDxLLs
 Add the current directory (human-centered-deferred-inference) to the python path. This is necessary for the import of scenario_manager.py:
 `export PYTHONPATH=$(pwd)`
 
+Update the ssl_context in `app.run()` of `webapp.py` (last line).
+
 `python webapp.py --scenario_category iui_2023_scenario --consent_form regular --rqd_constraint 1`
 
 # NB: terminology in code
