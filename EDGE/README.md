@@ -1,3 +1,5 @@
+This directory contains the EDGE estimator, not from this work. The original repository is [here](https://github.com/mrtnoshad/EDGE), and the original README (minus some lines on running example code that was removed) is below.
+
 # Scalable Mutual Information Estimation using Dependence Graphs for Deep Learning Applications
 
 EDGE is a scalable and optimum estimator of mutual information for deep learning applications
@@ -87,20 +89,3 @@ I = EDGE(X,Y,U=10, gamma=[1, 1], epsilon=[0,0], epsilon_vector = 'fixed', eps_ra
 ## Package Requirements:
 
 Python v3, numpy, scipy, sklearn, cvxpy v1.0 (if you are using ensemble estimation with optimum weights)
-
-## Demo for MI Estimator
-
-In the demo file, several examples of continuous-discrete dependencies are provided. 
-
-## Demo for Information Plane (Information Bottleneck) Visualization in Deep Neural Networks
-
-Two examples are available in the information_plane and information_plane_CNN folders for the MNIST data.
-
-
-## License
-
-This project is licensed under the University of Michigan License.
-
-## Your Comments and Questions Appreciated
-
-Please help to debug possible errors and improve the code by reporting your issues and problems with the code.
