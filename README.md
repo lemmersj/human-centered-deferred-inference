@@ -21,8 +21,6 @@ The conda environment I used at all steps (collection and analysis) is included 
 ## Analysis
 All analysis steps assume that you have downloaded the [experimental data](https://drive.google.com/file/d/1BzIjbCPyQBVH3uTGIcem83y8CJygwRwZ/view?usp=sharing) to the folder `user_trackers`. Outlier users (removed in our analysis) can be downloaded [here](https://drive.google.com/file/d/1O3cgEaESQ7KLooV72iC_TGUmZHmOeaPQ/view?usp=sharing)
 
-(This may or may not be necessary) Add the current directory (user-centered-deferred-inference) to the python path. This is necessary for the import of scenario_manager.py:
-`export PYTHONPATH=$(pwd)`
 ### Removing outliers
 If you download the outlier users, you can see our script identify them via the command `python analysis/find_outliers.py` from the repository root directory. Note that this does not alter the filesystem---these files must be deleted manually before performing any other analysis.
 
@@ -58,6 +56,9 @@ Model weights for UNITER can be downloaded [here](https://drive.google.com/file/
 download the [images and features](https://drive.google.com/file/d/19xjk7WnDxLLs9IKcE8atA8q9bIDNZith/view?usp=sharing), which should be unzipped to scenarios/iui_2023_scenario
 
 ### Running the webapp
+Add the current directory (human-centered-deferred-inference) to the python path. This is necessary for the import of scenario_manager.py:
+`export PYTHONPATH=$(pwd)`
+
 `python webapp.py --scenario_category iui_2023_scenario --consent_form regular --rqd_constraint 1`
 
 # NB: terminology in code
