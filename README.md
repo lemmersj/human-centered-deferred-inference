@@ -53,7 +53,7 @@ If you download the outlier users, you can see our script identify them via the 
 Model weights for UNITER can be downloaded [here](https://drive.google.com/file/d/1ybo4jqf63rzM4fY3-VwcJ7VPKtUFZg-S/view?usp=sharing). They should be downloaded to the directory net_weights/ckpt/.
 
 ### Download images and features
-download the [images and features](https://drive.google.com/file/d/19xjk7WnDxLLs9IKcE8atA8q9bIDNZith/view?usp=sharing), which should be unzipped to scenarios/iui_2023_scenario
+download the [images and features](https://drive.google.com/file/d/19xjk7WnDxLLs9IKcE8atA8q9bIDNZith/view?usp=sharing), which should be unzipped to scenarios/iui_2023_scenario. The features correspond to the tasks used in our study [scenarios/iui_2023_scenario.csv](scenarios/iui_2023_scenario.csv).
 
 ### Running the webapp
 Add the current directory (human-centered-deferred-inference) to the python path. This is necessary for the import of scenario_manager.py:
