@@ -1,15 +1,5 @@
 # Human-Centered Deferred Inference
-This is the repository for the IUI2023 paper titled: *Human-Centered Deferred Inference: Measuring User Interactions and Setting Deferral Criteria for Human-AI Teams.* If you find this work helpful, please cite:
-
-    @inproceedings{lemmer_evaluating_2023,
-	address = {Washington DC, United States},
-  	title = {Evaluating and Improving Interactions with Hazy Oracles},
-	booktitle = {Proceedings of the 2023 International Conference on Intelligent User Interfaces},
-	publisher = {ACM Press},
-  	author = {Lemmer, Stephan J. and Guo, Anhong and Corso, Jason J.},
-	month = March,
-	year = {2023}
-    }
+This is the repository for the IUI2023 paper titled: *Human-Centered Deferred Inference: Measuring User Interactions and Setting Deferral Criteria for Human-AI Teams.* Citation information will be added soon.
 
 ![A cartoon example of deferred inference](ledefigure-comic.png)
 ## Abstract
@@ -38,7 +28,7 @@ If you download the outlier users, you can see our script identify them via the 
 `python analysis/rq3_users_all_comparison.py` for statistical results and `python analysis/rq3_same_err_diff_dist.py` produces Fig 7, and compares the different users with the same error.
 
 ### RQ4: How do users respond when inference is deferred?
-`python analysis/rq4_depth_diff.py` outputs the results, as well as a tsv containing correlated initial queries and deferral responses used for table 1.
+`python analysis/rq4_depth_diff.py` outputs the results, as well as the tsv containing correlated initial queries and deferral responses used for table 1 (also uploaded [here](first_second_phrases.tsv).
 
 `python analysis/rq4_does_deferral_help.py` performs tests to determine if deferral improves accuracy.
 
