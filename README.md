@@ -9,7 +9,7 @@ Although deep learning holds the promise of novel and impactful interfaces, real
 The conda environment I used at all steps (collection and analysis) is included in environment.yml. However, it has some extraneous packages from previous experiments. It is also unlikely that the apex library will install correctly. This is not necessary for the analysis steps, but it is necessary for running the data collection.
 
 ## Analysis
-All analysis steps assume that you have downloaded the [experimental data](https://drive.google.com/file/d/1BzIjbCPyQBVH3uTGIcem83y8CJygwRwZ/view?usp=sharing) to the folder `user_trackers`. Outlier users (removed in our analysis) can be downloaded [here](https://drive.google.com/file/d/1O3cgEaESQ7KLooV72iC_TGUmZHmOeaPQ/view?usp=sharing)
+All analysis steps assume that you have downloaded the [experimental data](https://drive.google.com/file/d/1BzIjbCPyQBVH3uTGIcem83y8CJygwRwZ/view?usp=sharing) to the folder `user_trackers`. Outlier users (removed in our analysis) can be downloaded [here](https://drive.google.com/file/d/1O3cgEaESQ7KLooV72iC_TGUmZHmOeaPQ/view?usp=sharing). Release of anonymized data was approved by the University of Michigan IRB.
 
 ### Removing outliers
 If you download the outlier users, you can see our script identify them via the command `python analysis/find_outliers.py` from the repository root directory. Note that this does not alter the filesystem---these files must be deleted manually before performing any other analysis.
